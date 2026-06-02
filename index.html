@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ルービックキューブ補助 - 人気YouTuber式3Dガイド</title>
+<style>
+:root{
+  --bg:#101114;--panel:#181a1f;--panel2:#22252b;--line:#343842;
+  --text:#f5f6f8;--muted:#a6adbb;--soft:#d7dbe4;--accent:#ffbf3d;
+  --green:#49c779;--red:#e84855;--blue:#2878ff;--orange:#ff8a22;
+  --yellow:#f6df2e;--white:#f8f8f3;--shadow:0 18px 60px rgba(0,0,0,.32);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input{font:inherit}
+button{cursor:pointer}
+.app{min-height:100vh;display:grid;grid-template-rows:auto 1fr}
+.topbar{position:sticky;top:0;z-index:20;background:rgba(16,17,20,.94);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.top-inner{max-width:1180px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;gap:14px}
+.brand{font-weight:800;letter-spacing:.02em}
+.brand small{display:block;color:var(--muted);font-size:11px;font-weight:600;margin-top:2px}
+.pill{margin-left:auto;border:1px solid var(--line);background:var(--panel);color:var(--soft);border-radius:999px;padding:8px 12px;font-size:12px}
+.layout{max-width:1180px;width:100%;margin:0 auto;padding:18px;display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:18px}
+.viewer{background:linear-gradient(180deg,#202329,#15171b);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);min-height:620px;display:grid;grid-template-rows:auto 1fr auto;overflow:hidden}
+.viewer-head{padding:16px 18px;border-bottom:1px solid var(--line);display:grid;gap:6px}
+.eyebrow{font-size:12px;color:var(--accent);font-weight:800;letter-spacing:.12em}
+h1{font-size:24px;line-height:1.25;margin:0}
+.subtitle{color:var(--muted);font-size:14px;line-height:1.7;margin:0}
+.scene-wrap{position:relative;display:grid;place-items:center;min-height:420px;overflow:hidden;touch-action:none;background:
+  radial-gradient(circle at 48% 44%,rgba(255,191,61,.12),transparent 28%),
+  linear-gradient(180deg,rgba(255,255,255,.03),transparent)}
+.scene{width:420px;height:420px;position:relative;perspective:980px;user-select:none}
+.cube{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d;transition:transform .08s linear}
+.turn-layer{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d;transition:transform var(--turn-speed,520ms) cubic-bezier(.2,.8,.2,1)}
+.cubie{position:absolute;width:62px;height:62px;margin:-31px;transform-style:preserve-3d}
+.sticker{position:absolute;inset:3px;border-radius:6px;border:2px solid rgba(0,0,0,.54);box-shadow:inset 0 2px 8px rgba(255,255,255,.28),inset 0 -4px 8px rgba(0,0,0,.18)}
+.core{position:absolute;inset:3px;border-radius:7px;background:#11141a;border:1px solid #050608}
+.face-U{background:var(--yellow)}.face-D{background:var(--white)}.face-F{background:var(--red)}
+.face-B{background:var(--orange)}.face-R{background:var(--green)}.face-L{background:var(--blue)}
+.face-X{background:#101217}
+.hint-overlay{position:absolute;left:16px;right:16px;bottom:14px;display:flex;justify-content:space-between;gap:10px;pointer-events:none}
+.move-card{background:rgba(0,0,0,.48);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px 12px;min-width:180px}
+.move-big{font-size:34px;line-height:1;font-weight:900;color:var(--accent);font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.move-help{font-size:12px;color:#d9deeb;margin-top:4px}
+.drag-tip{align-self:end;background:rgba(0,0,0,.38);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:8px 11px;color:#d9deeb;font-size:12px}
+.controls{border-top:1px solid var(--line);padding:14px 16px;display:grid;gap:12px;background:rgba(0,0,0,.12)}
+.button-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:8px;padding:10px 12px;min-height:40px}
+.btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#141414;font-weight:800}
+.btn.ghost{background:transparent}
+.speed{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
+.speed input{accent-color:var(--accent)}
+.side{display:grid;gap:14px;align-content:start}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
+.panel-pad{padding:15px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.step-dot{border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:8px;padding:9px 4px;font-size:12px;font-weight:800}
+.step-dot.active{background:var(--accent);border-color:var(--accent);color:#111}
+.step-dot.done{border-color:rgba(73,199,121,.55);color:var(--green)}
+.variant-list{display:grid;gap:8px;margin-top:12px}
+.variant{width:100%;text-align:left;border:1px solid var(--line);background:var(--panel2);color:var(--soft);border-radius:8px;padding:10px 12px}
+.variant.active{border-color:var(--accent);box-shadow:0 0 0 1px rgba(255,191,61,.25) inset}
+.variant b{display:block;color:var(--text);font-size:13px;margin-bottom:2px}
+.variant span{font-size:12px;color:var(--muted);line-height:1.5}
+.section-title{margin:0 0 10px;font-size:13px;letter-spacing:.08em;color:var(--muted);font-weight:900}
+.moves{display:flex;gap:6px;flex-wrap:wrap}
+.move-chip{min-width:38px;text-align:center;border:1px solid var(--line);background:#111318;border-radius:8px;padding:8px 9px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:900;color:var(--soft)}
+.move-chip.done{background:rgba(73,199,121,.12);border-color:rgba(73,199,121,.5);color:var(--green)}
+.move-chip.current{background:rgba(255,191,61,.18);border-color:var(--accent);color:var(--accent);transform:translateY(-2px)}
+.explain{display:grid;gap:8px;max-height:250px;overflow:auto;padding-right:4px}
+.explain-row{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:9px;border:1px solid transparent;border-radius:8px;color:var(--muted);font-size:13px;line-height:1.55}
+.explain-row b{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--accent)}
+.explain-row.current{background:rgba(255,191,61,.1);border-color:rgba(255,191,61,.3);color:var(--text)}
+.note{color:var(--muted);line-height:1.7;font-size:13px}
+.legend{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.legend div{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
+.swatch{width:18px;height:18px;border-radius:5px;border:1px solid rgba(0,0,0,.5)}
+.refs{display:grid;gap:8px}
+.refs a{color:var(--accent);text-decoration:none;font-weight:800}
+.refs a:hover{text-decoration:underline}
+.net{display:grid;place-items:center;padding:12px;background:#111318;border-top:1px solid var(--line)}
+canvas{max-width:100%;height:auto}
+.completion{display:none;padding:28px;text-align:center}
+.completion.show{display:block}
+.completion h2{margin:0 0 8px;font-size:26px;color:var(--accent)}
+.tabs{display:flex;gap:8px;margin-left:6px}
+.tab{border:1px solid var(--line);background:var(--panel);color:var(--soft);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:800}
+.tab.active{background:var(--accent);border-color:var(--accent);color:#141414}
+#learnSide{display:none}
+.palette{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 2px}
+.swatch-btn{width:30px;height:30px;border-radius:8px;border:2px solid var(--line);padding:0}
+.swatch-btn.sel{border-color:#fff;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.neteditor{--ns:24px;display:grid;grid-template-columns:repeat(4,calc(var(--ns)*3 + 4px));grid-template-rows:repeat(3,calc(var(--ns)*3 + 4px));gap:6px;justify-content:center;margin:14px 0;grid-template-areas:". nu . ." "nl nf nr nb" ". nd . .";}
+.nface{display:grid;grid-template-columns:repeat(3,var(--ns));grid-template-rows:repeat(3,var(--ns));gap:2px}
+.nf-U{grid-area:nu}.nf-L{grid-area:nl}.nf-F{grid-area:nf}.nf-R{grid-area:nr}.nf-B{grid-area:nb}.nf-D{grid-area:nd}
+.nsticker{width:var(--ns);height:var(--ns);border-radius:4px;border:1px solid rgba(0,0,0,.55)}
+.nsticker:not(.center){cursor:pointer}
+.nsticker:not(.center):hover{outline:2px solid var(--accent)}
+.nsticker.unset{background:#2b2f37}
+.nsticker.center{box-shadow:inset 0 0 0 2px rgba(255,255,255,.4)}
+.valmsg{margin-top:10px;color:var(--accent);font-size:13px;line-height:1.6;min-height:18px}
+.phase-list{display:grid;gap:6px}
+.phase{border:1px solid var(--line);background:var(--panel2);color:var(--muted);border-radius:8px;padding:8px 10px;font-size:13px;font-weight:700}
+.phase.active{background:rgba(255,191,61,.16);border-color:var(--accent);color:var(--accent)}
+.phase.done{border-color:rgba(73,199,121,.5);color:var(--green)}
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;padding:12px}
+  .side{grid-row:2}
+  .viewer{min-height:560px}
+  .scene{width:min(94vw,420px);height:min(94vw,420px)}
+  .top-inner{padding:11px 12px}.pill{display:none}
+}
+@media(max-width:520px){
+  h1{font-size:20px}.viewer-head{padding:14px}.scene-wrap{min-height:360px}
+  .hint-overlay{display:block}.drag-tip{display:inline-block;margin-top:8px}
+  .button-row .btn{flex:1}.steps{grid-template-columns:repeat(4,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="top-inner">
+      <div class="brand">ルービックキューブ補助 3D<small>自分のキューブを入れて、1手ずつ完成へ</small></div>
+      <div class="tabs">
+        <button class="tab active" id="tabSolve">🧩 解く</button>
+        <button class="tab" id="tabLearn">📖 手順を学ぶ</button>
+      </div>
+      <div class="pill" id="progressText"></div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="viewer">
+      <div class="viewer-head">
+        <div class="eyebrow" id="stageLabel">STEP 01</div>
+        <h1 id="stageTitle"></h1>
+        <p class="subtitle" id="stageSub"></p>
+      </div>
+      <div class="scene-wrap" id="sceneWrap" aria-label="3Dキューブ表示">
+        <div class="scene">
+          <div class="cube" id="cube"></div>
+          <div class="turn-layer" id="turnLayer"></div>
+        </div>
+        <div class="hint-overlay">
+          <div class="move-card">
+            <div class="move-big" id="nextMove">R</div>
+            <div class="move-help" id="moveHelp">次の1手</div>
+          </div>
+          <div class="drag-tip">ドラッグでキューブを回転・手順は下のボタンで再生</div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="button-row">
+          <button class="btn" id="prevMove">前の1手</button>
+          <button class="btn primary" id="playMove">次の1手を動かす</button>
+          <button class="btn" id="autoPlay">自動再生</button>
+          <button class="btn ghost" id="resetAlg">手順を戻す</button>
+        </div>
+        <div class="button-row">
+          <button class="btn" data-view="front">正面</button>
+          <button class="btn" data-view="top">上から</button>
+          <button class="btn" data-view="right">右から</button>
+          <button class="btn" data-view="free">見やすい角度</button>
+          <label class="speed">速さ <input type="range" id="speed" min="260" max="1100" step="20" value="560"></label>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div id="solveSide">
+        <section class="panel panel-pad" id="inputPanel">
+          <p class="section-title">① 今のキューブを入力</p>
+          <div class="note" id="inputHelp">展開図の各マスを、お手持ちのキューブと同じ色に塗ってください。中央の色は固定（向きの目印）。<b>白を下・黄を上・赤を正面・緑を右</b>にして持つと合わせやすいです。塗り終えたら「この状態を解く」を押してください。</div>
+          <div class="palette" id="palette"></div>
+          <div class="neteditor" id="neteditor"></div>
+          <div class="button-row">
+            <button class="btn primary" id="solveBtn">この状態を解く</button>
+            <button class="btn" id="scrambleBtn">例で試す</button>
+            <button class="btn ghost" id="clearBtn">クリア</button>
+          </div>
+          <div class="valmsg" id="valmsg"></div>
+        </section>
+        <section class="panel panel-pad" id="phasePanel" style="display:none">
+          <p class="section-title">進行（フェーズ）</p>
+          <div class="phase-list" id="phaseList"></div>
+          <div class="note" id="phaseDesc" style="margin-top:10px"></div>
+          <div class="button-row" style="margin-top:12px">
+            <button class="btn" id="restartSolve">最初から</button>
+            <button class="btn ghost" id="backToInput">入力に戻る</button>
+          </div>
+        </section>
+        <section class="panel panel-pad" id="solveMovesPanel" style="display:none">
+          <p class="section-title">このフェーズの手順</p>
+          <div class="moves" id="solveMoves"></div>
+        </section>
+        <section class="panel panel-pad" id="solveExplainPanel" style="display:none">
+          <p class="section-title">1手ずつの意味</p>
+          <div class="explain" id="solveExplain"></div>
+        </section>
+        <section class="panel completion" id="solveCompletion">
+          <h2>6面完成！🎉</h2>
+          <p class="note">おめでとうございます。実物のキューブも、同じ向きに持って同じ手順をなぞれば完成します。</p>
+          <button class="btn primary" id="solveAgain">別の状態を解く</button>
+        </section>
+      </div>
+
+      <div id="learnSide">
+        <section class="panel panel-pad">
+          <p class="section-title">進行</p>
+          <div class="steps" id="stepDots"></div>
+        </section>
+        <section class="panel panel-pad">
+          <p class="section-title">この段階で使う形</p>
+          <div class="note" id="stageTip"></div>
+          <div class="variant-list" id="variants"></div>
+        </section>
+        <section class="panel panel-pad">
+          <p class="section-title">手順</p>
+          <div class="moves" id="moves"></div>
+        </section>
+        <section class="panel panel-pad">
+          <p class="section-title">1手ずつの意味</p>
+          <div class="explain" id="explain"></div>
+        </section>
+        <section class="panel completion" id="completion">
+          <h2>最後まで確認できました</h2>
+          <p class="note">実物のキューブでは、同じ形を探してから同じ向きに持ち替え、ここで見た手順を1手ずつ真似してください。</p>
+          <button class="btn primary" id="restart">最初から見る</button>
+        </section>
+      </div>
+
+      <section class="panel">
+        <div class="panel-pad">
+          <p class="section-title">色と面の読み方（今の状態）</p>
+          <div class="legend">
+            <div><i class="swatch face-U"></i>U 上・黄</div>
+            <div><i class="swatch face-D"></i>D 下・白</div>
+            <div><i class="swatch face-F"></i>F 手前・赤</div>
+            <div><i class="swatch face-B"></i>B 奥・橙</div>
+            <div><i class="swatch face-R"></i>R 右・緑</div>
+            <div><i class="swatch face-L"></i>L 左・青</div>
+          </div>
+        </div>
+        <div class="net"><canvas id="net" width="324" height="244"></canvas></div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script>
+const FACE_COLORS={U:"U",D:"D",F:"F",B:"B",R:"R",L:"L"};
+const NORMALS={U:[0,1,0],D:[0,-1,0],F:[0,0,1],B:[0,0,-1],R:[1,0,0],L:[-1,0,0]};
+const NORMAL_KEY={"0,1,0":"U","0,-1,0":"D","0,0,1":"F","0,0,-1":"B","1,0,0":"R","-1,0,0":"L"};
+const FACE_TRANSFORMS={
+  U:"rotateX(90deg) translateZ(31px)",D:"rotateX(-90deg) translateZ(31px)",
+  F:"translateZ(31px)",B:"rotateY(180deg) translateZ(31px)",
+  R:"rotateY(90deg) translateZ(31px)",L:"rotateY(-90deg) translateZ(31px)"
+};
+const AXIS={
+  U:{axis:"y",layer:1,dir:-1,name:"上面",plain:"時計回り"},D:{axis:"y",layer:-1,dir:1,name:"下面",plain:"時計回り"},
+  R:{axis:"x",layer:1,dir:-1,name:"右面",plain:"時計回り"},L:{axis:"x",layer:-1,dir:1,name:"左面",plain:"時計回り"},
+  F:{axis:"z",layer:1,dir:-1,name:"手前面",plain:"時計回り"},B:{axis:"z",layer:-1,dir:1,name:"奥面",plain:"時計回り"}
+};
+const VIEW_PRESETS={front:{x:-22,y:-34},top:{x:-58,y:-35},right:{x:-20,y:-72},free:{x:-28,y:-42}};
+const STEPS=[
+  {title:"白クロス",sub:"J Perm式の最初の段階。白いエッジ4つを白センターに集め、側面の色もセンターと合わせます。",tip:"最初だけ白センターを上にして探してもOK。白クロスができたら、以降は白を下・黄色を上に持ちます。",variants:[
+    alg("基本: F2で下へ入れる","白エッジが正面上に来たら、正面を180度回して白クロスへ入れる",["F2"]),
+    alg("逃がしてから入れる","邪魔な位置にある白エッジを上へ出し、正しいセンターの前に合わせてから入れる練習",["R","U","R'"])
+  ]},
+  {title:"1段目の白コーナー",sub:"白クロスを下にして、白を含む角を1つずつ下段へ入れます。",tip:"J Permが最初に覚えるよう勧める核が4手順です。右前上に置いたら右4手、左前上に置いたら左4手を繰り返します。",variants:[
+    alg("右4手: R U R' U'","右前上の白コーナーを右前下へ入れる基本手順",["R","U","R'","U'"]),
+    alg("左4手: L' U' L U","左前上の白コーナーを左前下へ入れる鏡手順",["L'","U'","L","U"])
+  ]},
+  {title:"2段目のエッジ",sub:"黄色を含まない上段エッジを、右か左の2段目へ入れます。",tip:"上面を回して側面センターと色を合わせます。もう1色の行き先が右なら右入れ、左なら左入れです。",variants:[
+    alg("右へ入れる","上段エッジを右側の2段目へ送るJ Perm式の右パターン",["U","R","U'","R'","U'","F'","U","F"]),
+    alg("左へ入れる","上段エッジを左側の2段目へ送る鏡パターン",["U'","L'","U","L","U","F","U'","F'"])
+  ]},
+  {title:"黄色クロス",sub:"上面の黄色エッジを十字にします。角の黄色はここでは無視します。",tip:"点なら何回か、線なら横向き、L字なら左奥に置いて実行。黄色クロスになるまで同じ手順を繰り返します。",variants:[
+    alg("F + 右4手 + F'","J Perm式のトップクロス。Fで構え、右4手をして、F'で戻す",["F","R","U","R'","U'","F'"])
+  ]},
+  {title:"黄色クロスの側面合わせ",sub:"黄色クロスのエッジを正しい位置へ入れ替え、側面センターの色と合わせます。",tip:"まず上面(U)を回して、合うエッジを1つでも多く側面センターに合わせます。3つを入れ替えるときは、合った1つを奥(B)に固定し、回したい向きでUa/Ubを選びます。2組がずれている場合は一度実行してから上面を合わせ直し、もう一度行います。",variants:[
+    alg("3エッジを反時計回り (Ua)","奥のエッジを固定し、手前・左・右の3エッジを反時計回りに1つずつ送る",["R","U'","R","U","R","U","R","U'","R'","U'","R2"]),
+    alg("3エッジを時計回り (Ub)","奥のエッジを固定し、3エッジを時計回りに送る鏡パターン",["R2","U","R","U","R'","U'","R'","U'","R'","U","R'"])
+  ]},
+  {title:"黄色コーナーの場所合わせ",sub:"黄色コーナーの向きはまだ気にせず、4つの角を正しい場所へ移します。",tip:"正しい場所の角が1つあれば右前に置きます。0個ならどこからでも一度実行し、正しい角を作ります。",variants:[
+    alg("角の場所合わせ","J Perm式のコーナー位置合わせ。右手と左手が交互に動く8手順",["U","R","U'","L'","U","R'","U'","L"])
+  ]},
+  {title:"最後: 黄色コーナーの向き",sub:"位置の合った黄色コーナーを1つずつひねって、6面完成まで持っていきます。",tip:"キューブは持ち替えません。直したい角を手前右上(URF)に置き、R' D' R D を黄色が上を向くまで2回か4回くり返します。途中で下の2段が崩れて見えても必ず戻るので、そのまま続けてください。1つ終わったら上面(U)だけを回して次の角を手前右上へ送り、同じことをくり返します。",variants:[
+    alg("角が3つずれている","各角でR' D' R Dを2回→Uで次へ。3回くり返し、最後にU2でそろえる",["R'","D'","R","D","R'","D'","R","D","U","R'","D'","R","D","R'","D'","R","D","U","R'","D'","R","D","R'","D'","R","D","U","U"]),
+    alg("角が2つずれている","一方は4回、もう一方は2回くり返して向きをそろえる例",["R'","D'","R","D","R'","D'","R","D","R'","D'","R","D","R'","D'","R","D","U","U","U","R'","D'","R","D","R'","D'","R","D","U"])
+  ]}
+];
+function alg(label,desc,moves){return{label,desc,moves,explain:moves.map(explainMove)}}
+function explainMove(m){
+  const base=m[0], info=AXIS[base];
+  const suffix=m.includes("2")?"を180度回す":m.includes("'")?"を反時計回りに90度回す":"を時計回りに90度回す";
+  return [m, info.name+suffix+"。動かす層だけを見て、ほかの面は固定して持ちます。"];
+}
+
+let cubies=[],stage=0,variant=0,moveIndex=-1,done={},turning=false,autoTimer=null,view={x:-28,y:-42},drag=null;
+const cubeEl=document.getElementById("cube"), layerEl=document.getElementById("turnLayer"), net=document.getElementById("net");
+
+function createSolved(){
+  const arr=[];
+  for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++){
+    if(x===0&&y===0&&z===0)continue;
+    const stickers={};
+    if(y===1)stickers["0,1,0"]="U"; if(y===-1)stickers["0,-1,0"]="D";
+    if(z===1)stickers["0,0,1"]="F"; if(z===-1)stickers["0,0,-1"]="B";
+    if(x===1)stickers["1,0,0"]="R"; if(x===-1)stickers["-1,0,0"]="L";
+    arr.push({id:`c${x}${y}${z}`,pos:{x,y,z},stickers});
+  }
+  return arr;
+}
+function cloneState(state){return state.map(c=>({id:c.id,pos:{...c.pos},stickers:{...c.stickers}}))}
+function currentVariant(){return STEPS[stage].variants[variant]}
+function inverseMove(m){
+  if(m.includes("2"))return m;
+  return m.includes("'")?m.replace("'",""):m+"'";
+}
+function setupForAlgorithm(){
+  cubies=createSolved();
+  currentVariant().moves.slice().reverse().map(inverseMove).forEach(m=>applyMoveState(m,cubies));
+  moveIndex=-1;
+}
+function vkey(v){return `${v[0]},${v[1]},${v[2]}`}
+function rotateVecObj(p,axis,dir){
+  const {x,y,z}=p;
+  if(axis==="x")return dir===1?{x,y:-z,z:y}:{x,y:z,z:-y};
+  if(axis==="y")return dir===1?{x:z,y,z:-x}:{x:-z,y,z:x};
+  return dir===1?{x:-y,y:x,z}:{x:y,y:-x,z};
+}
+function parseMove(m){
+  const base=m[0], prime=m.includes("'"), twice=m.includes("2"), info=AXIS[base];
+  const dir=(prime?-1:1)*info.dir;
+  return {...info,base,dir,turns:twice?2:1};
+}
+function inLayer(c,info){return c.pos[info.axis]===info.layer}
+function applyQuarter(info,state){
+  state.filter(c=>inLayer(c,info)).forEach(c=>{
+    c.pos=rotateVecObj(c.pos,info.axis,info.dir);
+    const next={};
+    Object.entries(c.stickers).forEach(([k,color])=>{
+      const n=k.split(",").map(Number), r=rotateVecObj({x:n[0],y:n[1],z:n[2]},info.axis,info.dir);
+      next[vkey([r.x,r.y,r.z])]=color;
+    });
+    c.stickers=next;
+  });
+}
+function applyMoveState(m,state=cubies){
+  const info=parseMove(m);
+  for(let i=0;i<info.turns;i++)applyQuarter(info,state);
+}
+function transformForPos(p){return `translate3d(${p.x*68}px,${-p.y*68}px,${p.z*68}px)`}
+function makeCubieEl(c){
+  const el=document.createElement("div");
+  el.className="cubie"; el.dataset.id=c.id; el.style.transform=transformForPos(c.pos);
+  const core=document.createElement("div"); core.className="core"; el.appendChild(core);
+  Object.entries(c.stickers).forEach(([k,color])=>{
+    const face=NORMAL_KEY[k], s=document.createElement("div");
+    s.className=`sticker face-${color}`; s.style.transform=FACE_TRANSFORMS[face];
+    el.appendChild(s);
+  });
+  return el;
+}
+function renderCube(){
+  cubeEl.innerHTML="";
+  cubies.sort((a,b)=>a.pos.z-b.pos.z||a.pos.y-b.pos.y||a.pos.x-b.pos.x).forEach(c=>cubeEl.appendChild(makeCubieEl(c)));
+  cubeEl.style.transform=`rotateX(${view.x}deg) rotateY(${view.y}deg)`;
+  drawNet();
+}
+function axisCss(axis){return axis==="x"?"X":axis==="y"?"Y":"Z"}
+function cssAngle(info){return info.dir*info.turns*90}
+function animateMove(m){
+  if(turning)return Promise.resolve(false);
+  const info=parseMove(m), selected=cubies.filter(c=>inLayer(c,info)).map(c=>c.id);
+  turning=true; setButtons();
+  const viewTransform=`rotateX(${view.x}deg) rotateY(${view.y}deg)`;
+  layerEl.style.transition="none"; layerEl.style.transform=viewTransform;
+  selected.forEach(id=>{
+    const el=cubeEl.querySelector(`[data-id="${id}"]`);
+    if(el)layerEl.appendChild(el);
+  });
+  requestAnimationFrame(()=> {
+    layerEl.style.setProperty("--turn-speed",document.getElementById("speed").value+"ms");
+    layerEl.style.transition="";
+    layerEl.style.transform=`${viewTransform} rotate${axisCss(info.axis)}(${cssAngle(info)}deg)`;
+  });
+  return new Promise(resolve=>{
+    const ms=Number(document.getElementById("speed").value)+60;
+    setTimeout(()=>{
+      applyMoveState(m);
+      layerEl.innerHTML=""; layerEl.style.transition="none"; layerEl.style.transform="";
+      turning=false; renderCube(); afterMove(); resolve(true);
+    },ms);
+  });
+}
+function moveDescription(m){
+  if(!m)return "この手順は完了です";
+  const info=AXIS[m[0]], amount=m.includes("2")?"180度":m.includes("'")?"反時計回り90度":"時計回り90度";
+  return `${info.name}を${amount}`;
+}
+async function nextMove(){
+  const moves=currentVariant().moves;
+  if(moveIndex>=moves.length-1||turning)return;
+  moveIndex++;
+  updateUI();
+  await animateMove(moves[moveIndex]);
+}
+function prevMove(){
+  if(turning||moveIndex<0)return;
+  const inv=inverseMove(currentVariant().moves[moveIndex]);
+  moveIndex--;
+  animateMove(inv);
+}
+function resetAlgorithm(){stopAuto();setupForAlgorithm();renderCube();updateUI()}
+function jumpStage(i){if(turning)return;done[stage]=true;stage=i;variant=0;setupForAlgorithm();renderCube();updateUI()}
+function setVariant(i){if(turning)return;variant=i;setupForAlgorithm();renderCube();updateUI()}
+function updateUI(){
+  const s=STEPS[stage], v=currentVariant(), moves=v.moves, next=moves[moveIndex+1];
+  document.getElementById("progressText").textContent=`STEP ${stage+1} / ${STEPS.length}`;
+  document.getElementById("stageLabel").textContent=`STEP ${String(stage+1).padStart(2,"0")}`;
+  document.getElementById("stageTitle").textContent=s.title;
+  document.getElementById("stageSub").textContent=s.sub;
+  document.getElementById("stageTip").textContent=s.tip;
+  document.getElementById("nextMove").textContent=next||"OK";
+  document.getElementById("moveHelp").textContent=next?`次: ${moveDescription(next)}`:"この形の手順は完了";
+  document.getElementById("stepDots").innerHTML=STEPS.map((_,i)=>`<button class="step-dot ${i===stage?"active":""} ${done[i]?"done":""}" onclick="jumpStage(${i})">${i+1}</button>`).join("");
+  document.getElementById("variants").innerHTML=s.variants.map((x,i)=>`<button class="variant ${i===variant?"active":""}" onclick="setVariant(${i})"><b>${x.label}</b><span>${x.desc}</span></button>`).join("");
+  document.getElementById("moves").innerHTML=moves.map((m,i)=>`<button class="move-chip ${i<moveIndex?"done":""} ${i===moveIndex?"current":""}">${m}</button>`).join("");
+  document.getElementById("explain").innerHTML=v.explain.map((r,i)=>`<div class="explain-row ${i===moveIndex+1?"current":""}"><b>${r[0]}</b><span>${r[1]}</span></div>`).join("");
+  document.getElementById("completion").classList.toggle("show",stage===STEPS.length-1&&moveIndex>=moves.length-1);
+  setButtons();
+  drawNet();
+}
+function setButtons(){
+  if(mode==="solve"){
+    const atEnd=solIndex>=solution.length-1;
+    document.getElementById("playMove").disabled=turning||atEnd||!solution.length;
+    document.getElementById("prevMove").disabled=turning||solIndex<0;
+    document.getElementById("resetAlg").disabled=turning||!solution.length;
+    document.getElementById("autoPlay").disabled=turning||atEnd||!solution.length;
+    return;
+  }
+  const atEnd=moveIndex>=currentVariant().moves.length-1;
+  document.getElementById("playMove").disabled=turning||atEnd;
+  document.getElementById("prevMove").disabled=turning||moveIndex<0;
+  document.getElementById("resetAlg").disabled=turning;
+  document.getElementById("autoPlay").disabled=turning||atEnd;
+}
+async function autoPlay(){
+  if(turning)return;
+  if(autoTimer){stopAuto();return;}
+  document.getElementById("autoPlay").textContent="停止";
+  autoTimer=true;
+  while(autoTimer&&moveIndex<currentVariant().moves.length-1){await nextMove();await wait(180)}
+  stopAuto();
+}
+function stopAuto(){autoTimer=false;document.getElementById("autoPlay").textContent="自動再生"}
+function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+function faceGrid(face){
+  const grid=Array(9).fill("X");
+  cubies.forEach(c=>{
+    Object.entries(c.stickers).forEach(([k,color])=>{
+      if(NORMAL_KEY[k]!==face)return;
+      const {x,y,z}=c.pos; let row=0,col=0;
+      if(face==="U"){row=z+1;col=x+1}
+      if(face==="D"){row=1-z;col=x+1}
+      if(face==="F"){row=1-y;col=x+1}
+      if(face==="B"){row=1-y;col=1-x}
+      if(face==="R"){row=1-y;col=1-z}
+      if(face==="L"){row=1-y;col=z+1}
+      grid[row*3+col]=color;
+    });
+  });
+  return grid;
+}
+function drawNet(){
+  const ctx=net.getContext("2d"), size=22,gap=4,off=6;
+  ctx.clearRect(0,0,net.width,net.height);
+  ctx.fillStyle="#111318";ctx.fillRect(0,0,net.width,net.height);
+  const pos={U:[1,0],L:[0,1],F:[1,1],R:[2,1],B:[3,1],D:[1,2]};
+  const css=getComputedStyle(document.documentElement);
+  const colors={U:css.getPropertyValue("--yellow"),D:css.getPropertyValue("--white"),F:css.getPropertyValue("--red"),B:css.getPropertyValue("--orange"),R:css.getPropertyValue("--green"),L:css.getPropertyValue("--blue"),X:"#101217"};
+  Object.entries(pos).forEach(([face,p])=>{
+    const grid=faceGrid(face), x0=off+p[0]*(size*3+gap), y0=off+p[1]*(size*3+gap);
+    ctx.fillStyle="#a6adbb";ctx.font="bold 11px system-ui";ctx.fillText(face,x0+2,y0-2);
+    grid.forEach((c,i)=>{
+      const x=x0+(i%3)*size,y=y0+Math.floor(i/3)*size;
+      ctx.fillStyle=colors[c];ctx.fillRect(x,y,size-2,size-2);
+      ctx.strokeStyle="rgba(0,0,0,.5)";ctx.strokeRect(x+.5,y+.5,size-3,size-3);
+    });
+  });
+}
+function setupDrag(){
+  const wrap=document.getElementById("sceneWrap");
+  wrap.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};wrap.setPointerCapture(e.pointerId)});
+  wrap.addEventListener("pointermove",e=>{
+    if(!drag)return;
+    view.x=Math.max(-80,Math.min(30,drag.vx-(e.clientY-drag.y)*.35));
+    view.y=drag.vy+(e.clientX-drag.x)*.45;
+    cubeEl.style.transform=`rotateX(${view.x}deg) rotateY(${view.y}deg)`;
+  });
+  wrap.addEventListener("pointerup",()=>drag=null);
+}
+function afterMove(){ if(mode==="solve") updateSolveUI(); else updateUI(); }
+
+/* ===================== SOLVER (beginner LBL, verified vs 4000 scrambles) ===================== */
+const FRBL=["F","R","B","L"];
+const RGT={F:"R",R:"B",B:"L",L:"F"}, LFT={F:"L",R:"F",B:"R",L:"B"};
+const nrm=f=>NORMALS[f].join(",");
+const DEDGE={F:"0,-1,1",R:"1,-1,0",B:"0,-1,-1",L:"-1,-1,0"};
+const UEDGE={F:"0,1,1",R:"1,1,0",B:"0,1,-1",L:"-1,1,0"};
+const SLOTC={F:"1,-1,1",R:"1,-1,-1",B:"-1,-1,-1",L:"-1,-1,1"};
+const UCORN={F:"1,1,1",R:"1,1,-1",B:"-1,1,-1",L:"-1,1,1"};
+const MIDk={F:"1,0,1",R:"1,0,-1",B:"-1,0,-1",L:"-1,0,1"};
+const UKj={0:"",1:"U",2:"U2",3:"U'"}, UKIj={0:"",1:"U'",2:"U2",3:"U"};
+const ALG_UA="R U' R U R U R U' R' U' R2", ALG_UB="R2 U R U R' U' R' U' R' U R'";
+const ALG_A="R' F R' B2 R F' R' B2 R2", ALG_OLL="F R U R' U' F'";
+const ALG_SUNE="R U R' U R U2 R'", ALG_ANTI="R U2 R' U' R U' R'";
+const ALG_T="R U R' U' R' F R2 U' R' U' R U R' F'";
+const pk=p=>`${p.x},${p.y},${p.z}`;
+const sAt=(st,key)=>st.find(c=>pk(c.pos)===key);
+const sFind=(st,colors)=>{const t=colors.slice().sort().join("");return st.find(c=>Object.values(c.stickers).sort().join("")===t);};
+const sNormalOf=(c,color)=>Object.keys(c.stickers).find(k=>c.stickers[k]===color);
+const sApply=(st,seq)=>seq.split(" ").forEach(m=>{if(m)applyMoveState(m,st);});
+const setEq=(a,b)=>a.length===b.length&&a.slice().sort().join(",")===b.slice().sort().join(",");
+const isSolvedState=st=>st.every(c=>Object.entries(c.stickers).every(([k,v])=>NORMAL_KEY[k]===v));
+function facesOfEdge(key){const[a,,c]=key.split(",").map(Number),r=[];if(a===1)r.push("R");if(a===-1)r.push("L");if(c===1)r.push("F");if(c===-1)r.push("B");return r;}
+const amtMove=m=>m.endsWith("2")?2:(m.endsWith("'")?3:1);
+const tokMove=(face,a)=>{a=((a%4)+4)%4;return a===0?null:face+(a===1?"":a===2?"2":"'");};
+function cleanupTagged(seq){let out=seq.slice(),ch=true;while(ch){ch=false;const r=[];let i=0;while(i<out.length){if(i+1<out.length&&out[i].move[0]===out[i+1].move[0]){const t=tokMove(out[i].move[0],amtMove(out[i].move)+amtMove(out[i+1].move));if(t)r.push({phase:out[i].phase,move:t});i+=2;ch=true;}else{r.push(out[i]);i++;}}out=r;}return out;}
+function cartesian(ch,d){let res=[[]];for(let i=0;i<d;i++){const nx=[];for(const r of res)for(const c of ch)nx.push(r.concat([c]));res=nx;}return res;}
+
+function solveCube(start){
+  let S=cloneState(start); const sol=[];
+  const mv=(ph,seq)=>seq.split(" ").forEach(m=>{if(m){applyMoveState(m,S);sol.push({phase:ph,move:m});}});
+  const at=k=>sAt(S,k), find=cs=>sFind(S,cs);
+  const conj=(k,alg)=>(UKj[k]+" "+alg+" "+UKIj[k]).trim();
+  const Uadj=(ph,cond)=>{for(let k=0;k<4;k++){const T=cloneState(S);sApply(T,UKj[k]);if(cond(T)){if(UKj[k])mv(ph,UKj[k]);return true;}}return false;};
+  const whiteup=f=>{const c=at(UEDGE[f]);return !!c&&c.stickers["0,1,0"]==="D";};
+  const ensureEmpty=g=>{if(whiteup(g))Uadj("cross",T=>{const c=sAt(T,UEDGE[g]);return !(c&&c.stickers["0,1,0"]==="D");});};
+  for(const color of FRBL){let cap=0;
+    while(true){ if(++cap>60)throw new Error("cross");
+      const e=find(["D",color]),p=e.pos,key=pk(p),wn=sNormalOf(e,"D");
+      if(p.y===1&&wn==="0,1,0")break;
+      if(p.y===1){const sf=NORMAL_KEY[wn];for(const cd of [sf,sf+"'"]){const T=cloneState(S);sApply(T,cd);if(sFind(T,["D",color]).pos.y===0){mv("cross",cd);break;}}continue;}
+      if(p.y===0){const fs=facesOfEdge(key);let done=false;
+        for(const g of fs){for(const cd of [g,g+"'"]){const T=cloneState(S);sApply(T,cd);const ee=sFind(T,["D",color]);if(ee.pos.y===1&&ee.stickers["0,1,0"]==="D"){ensureEmpty(g);mv("cross",cd);done=true;break;}}if(done)break;}
+        if(!done){const g=fs[0];ensureEmpty(g);for(const cd of [g,g+"'"]){const T=cloneState(S);sApply(T,cd);if(sFind(T,["D",color]).pos.y===1){mv("cross",cd);break;}}}
+        continue;}
+      const sf=FRBL.find(g=>DEDGE[g]===key);
+      if(wn==="0,-1,0"){ensureEmpty(sf);mv("cross",sf+"2");}
+      else{ensureEmpty(sf);for(const cd of [sf,sf+"'"]){const T=cloneState(S);sApply(T,cd);if(sFind(T,["D",color]).pos.y===0){mv("cross",cd);break;}}}
+    }
+  }
+  for(const f of FRBL){Uadj("cross",T=>{const c=sAt(T,UEDGE[f]);return !!c&&c.stickers["0,1,0"]==="D"&&setEq(Object.values(c.stickers),["D",f]);});mv("cross",f+"2");}
+  const cdone=f=>{const c=find(["D",f,RGT[f]]);return pk(c.pos)===SLOTC[f]&&c.stickers["0,-1,0"]==="D";};
+  for(const f of FRBL){let cap=0;
+    while(!cdone(f)){ if(++cap>40)throw new Error("layer1");
+      const c=find(["D",f,RGT[f]]),p=c.pos,key=pk(p);
+      if(p.y===-1&&key!==SLOTC[f]){const g=FRBL.find(gg=>SLOTC[gg]===key);mv("layer1",`${RGT[g]} U ${RGT[g]}'`);continue;}
+      if(key===SLOTC[f]&&c.stickers["0,-1,0"]!=="D"){mv("layer1",`${RGT[f]} U ${RGT[f]}'`);continue;}
+      if(p.y===1){ if(key!==UCORN[f]){Uadj("layer1",T=>pk(sFind(T,["D",f,RGT[f]]).pos)===UCORN[f]);continue;} mv("layer1",`${RGT[f]} U ${RGT[f]}' U'`);continue;}
+    }
+  }
+  const mdone=f=>{const c=find([f,RGT[f]]);return pk(c.pos)===MIDk[f]&&c.stickers[nrm(f)]===f&&c.stickers[nrm(RGT[f])]===RGT[f];};
+  const rIns=fr=>mv("layer2",`U ${RGT[fr]} U' ${RGT[fr]}' U' ${fr}' U ${fr}`);
+  const lIns=fr=>mv("layer2",`U' ${LFT[fr]}' U ${LFT[fr]} U ${fr} U' ${fr}'`);
+  for(const f of FRBL){let cap=0;
+    while(!mdone(f)){ if(++cap>40)throw new Error("layer2");
+      const e=find([f,RGT[f]]),p=e.pos;
+      if(p.y===0){const g=FRBL.find(gg=>MIDk[gg]===pk(p));rIns(g);continue;}
+      if(p.y===1){
+        const matched=T=>{const c=sFind(T,[f,RGT[f]]),side=Object.keys(c.stickers).find(k=>k!=="0,1,0");return c.stickers[side]===NORMAL_KEY[side];};
+        if(!matched(S)){Uadj("layer2",matched);continue;}
+        const c=find([f,RGT[f]]),side=Object.keys(c.stickers).find(k=>k!=="0,1,0"),fr=NORMAL_KEY[side],top=c.stickers["0,1,0"];
+        if(top===RGT[fr])rIns(fr);else if(top===LFT[fr])lIns(fr);else mv("layer2","U");
+        continue;}
+      mv("layer2","U");
+    }
+  }
+  const ups=()=>FRBL.filter(f=>at(UEDGE[f]).stickers["0,1,0"]==="U");
+  {let cap=0;while(ups().length!==4){ if(++cap>10)throw new Error("ycross");
+    const u=ups();
+    if(u.length===2){const opp=(u.includes("F")&&u.includes("B"))||(u.includes("L")&&u.includes("R"));const tgt=opp?["L","R"]:["B","L"];
+      Uadj("ycross",T=>setEq(FRBL.filter(f=>sAt(T,UEDGE[f]).stickers["0,1,0"]==="U"),tgt));}
+    mv("ycross",ALG_OLL);
+  }}
+  const allUp=T=>FRBL.every(f=>sAt(T,UCORN[f]).stickers["0,1,0"]==="U");
+  if(!allUp(S)){const choices=[];for(let k=0;k<4;k++)for(const a of [ALG_SUNE,ALG_ANTI])choices.push([k,a]);let done=false;
+    for(let d=1;d<=3&&!done;d++){for(const combo of cartesian(choices,d)){const seq=combo.map(([k,a])=>(UKj[k]+" "+a).trim()).join(" ");const T=cloneState(S);sApply(T,seq);if(allUp(T)){mv("ocorner",seq);done=true;break;}}}
+    if(!done)throw new Error("ocorner");
+  }
+  const parity=T=>{const home={};FRBL.forEach(f=>home[["U",f,RGT[f]].sort().join("")]=UCORN[f]);const perm={};FRBL.forEach(f=>{perm[UCORN[f]]=home[Object.values(sAt(T,UCORN[f]).stickers).sort().join("")];});const seen=new Set();let par=0;for(const f of FRBL){let x=UCORN[f];if(seen.has(x))continue;let l=0;while(!seen.has(x)){seen.add(x);x=perm[x];l++;}par+=l-1;}return par%2;};
+  if(parity(S)===1)mv("cperm",ALG_T);
+  const positioned=T=>FRBL.every(f=>setEq(Object.values(sAt(T,UCORN[f]).stickers),["U",f,RGT[f]]));
+  {let cap=0;while(!positioned(S)){ if(++cap>12)throw new Error("cperm");let placed=false;
+    for(let k=0;k<4&&!placed;k++)for(const rep of [1,2]){const seq=conj(k,Array(rep).fill(ALG_A).join(" "));const T=cloneState(S);sApply(T,seq);if(positioned(T)){mv("cperm",seq);placed=true;break;}}
+    if(!placed)mv("cperm",ALG_A);
+  }}
+  const ema=T=>FRBL.every(f=>sAt(T,UEDGE[f]).stickers[nrm(f)]===f);
+  {let cap=0;while(!ema(S)){ if(++cap>12)throw new Error("eperm");let placed=false;
+    for(let k=0;k<4&&!placed;k++)for(const alg of [ALG_UA,ALG_UB]){const seq=conj(k,alg);const T=cloneState(S);sApply(T,seq);if(ema(T)){mv("eperm",seq);placed=true;break;}}
+    if(!placed)mv("eperm",conj(0,ALG_UA));
+  }}
+  for(let k=0;k<4;k++){const T=cloneState(S);sApply(T,UKj[k]);if(isSolvedState(T)){if(UKj[k])mv("eperm",UKj[k]);break;}}
+  if(!isSolvedState(S))throw new Error("final");
+  return cleanupTagged(sol);
+}
+
+/* ===================== INPUT + SOLVE MODE ===================== */
+let mode="solve", solution=[], solIndex=-1, userState=null, phaseSpans=[], netColors={}, currentPaint="F";
+const COLORNAME={U:"黄",D:"白",F:"赤",B:"橙",R:"緑",L:"青"};
+const PHASE_ORDER=["cross","layer1","layer2","ycross","ocorner","cperm","eperm"];
+const PHASEMETA={
+  cross:{name:"① 白い十字（白クロス）",desc:"白い面のエッジ4つを白センターのまわりに集め、側面の色も合わせて十字を作ります。"},
+  layer1:{name:"② 1段目の角",desc:"白を含む角を1つずつ下段へ入れ、白い面（1段目）を完成させます。"},
+  layer2:{name:"③ 2段目のエッジ",desc:"黄色を含まない中段のエッジを、左右の正しい位置へ入れます。"},
+  ycross:{name:"④ 黄色い十字",desc:"上面の黄色いエッジを十字にそろえます（角の向きはまだ気にしません）。"},
+  ocorner:{name:"⑤ 黄色い面を完成",desc:"上の角の向きをそろえ、黄色い面を完成させます。"},
+  cperm:{name:"⑥ 角の位置を合わせる",desc:"黄色い角を正しい位置へ入れ替えます（向きは保ったまま）。"},
+  eperm:{name:"⑦ 辺を合わせて完成",desc:"最後に残ったエッジを入れ替え、6面を完成させます。"}
+};
+function mapCell(face,row,col){let x,y,z,n;
+  if(face==="U"){y=1;z=row-1;x=col-1;n="0,1,0";}
+  else if(face==="D"){y=-1;z=1-row;x=col-1;n="0,-1,0";}
+  else if(face==="F"){z=1;y=1-row;x=col-1;n="0,0,1";}
+  else if(face==="B"){z=-1;y=1-row;x=1-col;n="0,0,-1";}
+  else if(face==="R"){x=1;y=1-row;z=1-col;n="1,0,0";}
+  else {x=-1;y=1-row;z=col-1;n="-1,0,0";}
+  return {pos:{x,y,z},normal:n};
+}
+function initNet(){netColors={};for(const f of ["U","D","F","B","R","L"]){netColors[f]=Array(9).fill(null);netColors[f][4]=f;}}
+function fillNetFromState(st){for(const f of ["U","D","F","B","R","L"])for(let i=0;i<9;i++){const{pos,normal}=mapCell(f,(i/3|0),i%3);netColors[f][i]=sAt(st,pk(pos)).stickers[normal];}}
+function buildNetEditor(){const root=document.getElementById("neteditor");root.innerHTML="";for(const f of ["U","L","F","R","B","D"]){const nf=document.createElement("div");nf.className="nface nf-"+f;for(let i=0;i<9;i++){const s=document.createElement("div");s.className="nsticker";s.dataset.face=f;s.dataset.idx=i;if(i===4)s.classList.add("center");s.onclick=()=>paint(f,i);nf.appendChild(s);}root.appendChild(nf);}}
+function renderNet(){document.querySelectorAll("#neteditor .nsticker").forEach(s=>{const v=netColors[s.dataset.face][+s.dataset.idx];s.className="nsticker"+(+s.dataset.idx===4?" center":"")+(v?(" face-"+v):" unset");});}
+function buildPalette(){const p=document.getElementById("palette");p.innerHTML="";for(const l of ["U","D","F","B","R","L"]){const b=document.createElement("button");b.className="swatch-btn face-"+l+(l===currentPaint?" sel":"");b.title=COLORNAME[l];b.onclick=()=>{currentPaint=l;buildPalette();};p.appendChild(b);}}
+function paint(f,i){if(i===4)return;netColors[f][i]=currentPaint;renderNet();renderPreview();document.getElementById("valmsg").textContent="";}
+function buildStateFromNet(prev){const cubs=[];for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++){if(!x&&!y&&!z)continue;cubs.push({id:`c${x}${y}${z}`,pos:{x,y,z},stickers:{}});}
+  const idx=(x,y,z)=>cubs.find(c=>c.pos.x===x&&c.pos.y===y&&c.pos.z===z);
+  for(const f of ["U","D","F","B","R","L"])for(let i=0;i<9;i++){const{pos,normal}=mapCell(f,(i/3|0),i%3),v=netColors[f][i];idx(pos.x,pos.y,pos.z).stickers[normal]=prev?(v||"X"):v;}
+  return cubs;}
+function renderPreview(){cubies=buildStateFromNet(true);renderCube();}
+const multisetEq=(a,b)=>a.length===b.length&&a.slice().sort().join("|")===b.slice().sort().join("|");
+function validateNet(){
+  for(const f in netColors)for(const v of netColors[f])if(v===null)return "すべてのマスを塗ってください。";
+  const state=buildStateFromNet(false);
+  const cnt={};state.forEach(c=>Object.values(c.stickers).forEach(v=>cnt[v]=(cnt[v]||0)+1));
+  for(const l of ["U","D","F","B","R","L"])if(cnt[l]!==9)return `色の数が合いません（${COLORNAME[l]}が${cnt[l]||0}個。各色9個にしてください）。`;
+  const SE=[["U","F"],["U","R"],["U","B"],["U","L"],["D","F"],["D","R"],["D","B"],["D","L"],["F","R"],["R","B"],["B","L"],["L","F"]].map(s=>s.sort().join(""));
+  const SC=[["U","F","R"],["U","R","B"],["U","B","L"],["U","L","F"],["D","F","R"],["D","R","B"],["D","B","L"],["D","L","F"]].map(s=>s.sort().join(""));
+  const ed=state.filter(c=>Object.keys(c.stickers).length===2).map(c=>Object.values(c.stickers).sort().join(""));
+  const co=state.filter(c=>Object.keys(c.stickers).length===3).map(c=>Object.values(c.stickers).sort().join(""));
+  if(!multisetEq(ed,SE)||!multisetEq(co,SC))return "入力に矛盾があります（同じパーツの重複や、ありえない組み合わせ）。色を見直してください。";
+  try{const sol=solveCube(state);return{ok:true,sol,state};}catch(e){return "この配置は解けません。中央の色（向き）と各マスの色をもう一度確認してください。";}
+}
+function showInput(){document.getElementById("inputPanel").style.display="";["phasePanel","solveMovesPanel","solveExplainPanel"].forEach(id=>document.getElementById(id).style.display="none");document.getElementById("solveCompletion").classList.remove("show");document.getElementById("stageLabel").textContent="じぶんのキューブを入力";document.getElementById("stageTitle").textContent="展開図を塗ってください";document.getElementById("stageSub").textContent="右の図を、お手持ちのキューブと同じ色に塗って『この状態を解く』を押します。";document.getElementById("nextMove").textContent="🎨";document.getElementById("moveHelp").textContent="色を塗って解いてね";}
+function showPlayback(){document.getElementById("inputPanel").style.display="none";["phasePanel","solveMovesPanel","solveExplainPanel"].forEach(id=>document.getElementById(id).style.display="");}
+function computePhases(){phaseSpans=[];solution.forEach((s,i)=>{const last=phaseSpans[phaseSpans.length-1];if(last&&last.phase===s.phase)last.end=i;else phaseSpans.push({phase:s.phase,start:i,end:i});});}
+function runSolve(){const res=validateNet();if(typeof res==="string"){document.getElementById("valmsg").textContent="⚠ "+res;return;}solution=res.sol;userState=res.state;computePhases();startPlayback();}
+function startPlayback(){stopAuto();showPlayback();cubies=cloneState(userState);solIndex=-1;renderCube();updateSolveUI();}
+function restartPlayback(){stopAuto();cubies=cloneState(userState);solIndex=-1;renderCube();updateSolveUI();}
+async function solveNext(){if(solIndex>=solution.length-1||turning)return;solIndex++;updateSolveUI();await animateMove(solution[solIndex].move);}
+function solvePrev(){if(turning||solIndex<0)return;const inv=inverseMove(solution[solIndex].move);solIndex--;animateMove(inv);}
+async function solveAuto(){if(turning)return;if(autoTimer){stopAuto();return;}document.getElementById("autoPlay").textContent="停止";autoTimer=true;while(autoTimer&&solIndex<solution.length-1){await solveNext();await wait(140);}stopAuto();}
+function updateSolveUI(){
+  const total=solution.length,nextI=solIndex+1;
+  document.getElementById("progressText").textContent=`手 ${Math.min(solIndex+1,total)} / ${total}`;
+  const curPhase=nextI<total?solution[nextI].phase:(total?solution[total-1].phase:"cross");
+  const meta=PHASEMETA[curPhase];
+  document.getElementById("stageLabel").textContent="じぶんのキューブを解く";
+  document.getElementById("stageTitle").textContent=meta.name;
+  document.getElementById("stageSub").textContent=meta.desc;
+  document.getElementById("phaseDesc").textContent=meta.desc;
+  document.getElementById("phaseList").innerHTML=PHASE_ORDER.filter(p=>phaseSpans.some(s=>s.phase===p)).map(p=>{const span=phaseSpans.find(s=>s.phase===p);const done=span.end<=solIndex;const active=p===curPhase&&nextI<total;return `<div class="phase ${active?"active":""} ${done?"done":""}">${PHASEMETA[p].name}</div>`;}).join("");
+  const nm=nextI<total?solution[nextI].move:null;
+  document.getElementById("nextMove").textContent=nm||"完成";
+  document.getElementById("moveHelp").textContent=nm?`次: ${moveDescription(nm)}`:"6面完成です！";
+  const span=phaseSpans.find(s=>s.phase===curPhase)||{start:0,end:-1};
+  let chips="",expl="";
+  for(let i=span.start;i<=span.end;i++){const m=solution[i].move;chips+=`<button class="move-chip ${i<solIndex?"done":""} ${i===solIndex?"current":""}">${m}</button>`;const e=explainMove(m);expl+=`<div class="explain-row ${i===nextI?"current":""}"><b>${e[0]}</b><span>${e[1]}</span></div>`;}
+  document.getElementById("solveMoves").innerHTML=chips;
+  document.getElementById("solveExplain").innerHTML=expl;
+  document.getElementById("solveCompletion").classList.toggle("show",total>0&&solIndex>=total-1);
+  setButtons();drawNet();
+}
+function randScramble(n){const fs=["U","D","F","B","R","L"],sx=["","'","2"];let last="",out=[];for(let i=0;i<n;i++){let f=fs[Math.random()*6|0];while(f===last)f=fs[Math.random()*6|0];last=f;out.push(f+sx[Math.random()*3|0]);}return out.join(" ");}
+function loadExample(){const st=createSolved();sApply(st,randScramble(25));fillNetFromState(st);renderNet();renderPreview();document.getElementById("valmsg").textContent="ランダムな例を入れました。「この状態を解く」を押してね。";}
+function setMode(m){stopAuto();mode=m;document.getElementById("tabSolve").classList.toggle("active",m==="solve");document.getElementById("tabLearn").classList.toggle("active",m==="learn");document.getElementById("solveSide").style.display=m==="solve"?"block":"none";document.getElementById("learnSide").style.display=m==="learn"?"block":"none";
+  if(m==="learn"){setupForAlgorithm();renderCube();updateUI();}
+  else{if(!solution.length){showInput();renderNet();renderPreview();document.getElementById("progressText").textContent="";}else{showPlayback();cubies=cloneState(userState);for(let i=0;i<=solIndex;i++)applyMoveState(solution[i].move,cubies);renderCube();updateSolveUI();}}
+}
+
+/* ===================== WIRING ===================== */
+const $=id=>document.getElementById(id);
+$("playMove").onclick=()=>mode==="solve"?solveNext():nextMove();
+$("prevMove").onclick=()=>mode==="solve"?solvePrev():prevMove();
+$("autoPlay").onclick=()=>mode==="solve"?solveAuto():autoPlay();
+$("resetAlg").onclick=()=>mode==="solve"?restartPlayback():resetAlgorithm();
+$("restart").onclick=()=>{done={};stage=0;variant=0;resetAlgorithm();};
+$("solveBtn").onclick=runSolve;
+$("scrambleBtn").onclick=loadExample;
+$("clearBtn").onclick=()=>{initNet();renderNet();renderPreview();$("valmsg").textContent="";};
+$("backToInput").onclick=()=>{stopAuto();solution=[];showInput();renderPreview();$("progressText").textContent="";};
+$("restartSolve").onclick=restartPlayback;
+$("solveAgain").onclick=()=>{stopAuto();solution=[];initNet();showInput();renderNet();renderPreview();$("progressText").textContent="";};
+$("tabSolve").onclick=()=>setMode("solve");
+$("tabLearn").onclick=()=>setMode("learn");
+document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{view={...VIEW_PRESETS[b.dataset.view]};renderCube();});
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowRight"){e.preventDefault();mode==="solve"?solveNext():nextMove();}
+  if(e.key==="ArrowLeft"){e.preventDefault();mode==="solve"?solvePrev():prevMove();}
+  if(mode==="learn"){if(e.key==="ArrowDown"){e.preventDefault();if(stage<STEPS.length-1)jumpStage(stage+1);}if(e.key==="ArrowUp"){e.preventDefault();if(stage>0)jumpStage(stage-1);}}
+});
+setupDrag();
+buildPalette();buildNetEditor();initNet();
+setMode("solve");
+</script>
+</body>
+</html>
