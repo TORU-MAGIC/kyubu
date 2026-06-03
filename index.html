@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ルービックキューブ補助 - 人気YouTuber式3Dガイド</title>
+<title>ルービックキューブ補助 - 最短手順3Dガイド</title>
 <style>
 :root{
   --bg:#101114;--panel:#181a1f;--panel2:#22252b;--line:#343842;
@@ -124,7 +124,7 @@ canvas{max-width:100%;height:auto}
 <div class="app">
   <header class="topbar">
     <div class="top-inner">
-      <div class="brand">ルービックキューブ補助 3D<small>自分のキューブを入れて、1手ずつ完成へ</small></div>
+      <div class="brand">ルービックキューブ補助 3D<small>自分のキューブを入れて、最短手順で1手ずつ完成へ</small></div>
       <div class="tabs">
         <button class="tab active" id="tabSolve">🧩 解く</button>
         <button class="tab" id="tabLearn">📖 手順を学ぶ</button>
@@ -174,7 +174,7 @@ canvas{max-width:100%;height:auto}
       <div id="solveSide">
         <section class="panel panel-pad" id="inputPanel">
           <p class="section-title">① 今のキューブを入力</p>
-          <div class="note" id="inputHelp">展開図の各マスを、お手持ちのキューブと同じ色に塗ってください。中央の色は固定（向きの目印）。<b>白を下・黄を上・赤を正面・緑を右</b>にして持つと合わせやすいです。塗り終えたら「この状態を解く」を押してください。</div>
+          <div class="note" id="inputHelp">展開図の各マスを、お手持ちのキューブと同じ色に塗ってください。中央の色は固定（向きの目印）。<b>白を下・黄を上・赤を正面・緑を右</b>にして持つと合わせやすいです。塗り終えたら「この状態を解く」を押すと、<b>最短に近い手順（約20手）</b>を自動計算します。</div>
           <div class="palette" id="palette"></div>
           <div class="neteditor" id="neteditor"></div>
           <div class="button-row">
@@ -202,7 +202,7 @@ canvas{max-width:100%;height:auto}
           <div class="explain" id="solveExplain"></div>
         </section>
         <section class="panel completion" id="solveCompletion">
-          <h2>6面完成！🎉</h2>
+          <h2>最短手順で6面完成！🎉</h2>
           <p class="note">おめでとうございます。実物のキューブも、同じ向きに持って同じ手順をなぞれば完成します。</p>
           <button class="btn primary" id="solveAgain">別の状態を解く</button>
         </section>
@@ -509,122 +509,200 @@ function setupDrag(){
 }
 function afterMove(){ if(mode==="solve") updateSolveUI(); else updateUI(); }
 
-/* ===================== SOLVER (beginner LBL, verified vs 4000 scrambles) ===================== */
-const FRBL=["F","R","B","L"];
-const RGT={F:"R",R:"B",B:"L",L:"F"}, LFT={F:"L",R:"F",B:"R",L:"B"};
-const nrm=f=>NORMALS[f].join(",");
-const DEDGE={F:"0,-1,1",R:"1,-1,0",B:"0,-1,-1",L:"-1,-1,0"};
-const UEDGE={F:"0,1,1",R:"1,1,0",B:"0,1,-1",L:"-1,1,0"};
-const SLOTC={F:"1,-1,1",R:"1,-1,-1",B:"-1,-1,-1",L:"-1,-1,1"};
-const UCORN={F:"1,1,1",R:"1,1,-1",B:"-1,1,-1",L:"-1,1,1"};
-const MIDk={F:"1,0,1",R:"1,0,-1",B:"-1,0,-1",L:"-1,0,1"};
-const UKj={0:"",1:"U",2:"U2",3:"U'"}, UKIj={0:"",1:"U'",2:"U2",3:"U"};
-const ALG_UA="R U' R U R U R U' R' U' R2", ALG_UB="R2 U R U R' U' R' U' R' U R'";
-const ALG_A="R' F R' B2 R F' R' B2 R2", ALG_OLL="F R U R' U' F'";
-const ALG_SUNE="R U R' U R U2 R'", ALG_ANTI="R U2 R' U' R U' R'";
-const ALG_T="R U R' U' R' F R2 U' R' U' R U R' F'";
+/* ===================== SOLVER (Kociemba 2段階法・約20手の最短に近い解) ===================== */
+/* 汎用ヘルパー（ソルバ外でも使用） */
 const pk=p=>`${p.x},${p.y},${p.z}`;
 const sAt=(st,key)=>st.find(c=>pk(c.pos)===key);
-const sFind=(st,colors)=>{const t=colors.slice().sort().join("");return st.find(c=>Object.values(c.stickers).sort().join("")===t);};
-const sNormalOf=(c,color)=>Object.keys(c.stickers).find(k=>c.stickers[k]===color);
 const sApply=(st,seq)=>seq.split(" ").forEach(m=>{if(m)applyMoveState(m,st);});
-const setEq=(a,b)=>a.length===b.length&&a.slice().sort().join(",")===b.slice().sort().join(",");
 const isSolvedState=st=>st.every(c=>Object.entries(c.stickers).every(([k,v])=>NORMAL_KEY[k]===v));
-function facesOfEdge(key){const[a,,c]=key.split(",").map(Number),r=[];if(a===1)r.push("R");if(a===-1)r.push("L");if(c===1)r.push("F");if(c===-1)r.push("B");return r;}
-const amtMove=m=>m.endsWith("2")?2:(m.endsWith("'")?3:1);
-const tokMove=(face,a)=>{a=((a%4)+4)%4;return a===0?null:face+(a===1?"":a===2?"2":"'");};
-function cleanupTagged(seq){let out=seq.slice(),ch=true;while(ch){ch=false;const r=[];let i=0;while(i<out.length){if(i+1<out.length&&out[i].move[0]===out[i+1].move[0]){const t=tokMove(out[i].move[0],amtMove(out[i].move)+amtMove(out[i+1].move));if(t)r.push({phase:out[i].phase,move:t});i+=2;ch=true;}else{r.push(out[i]);i++;}}out=r;}return out;}
-function cartesian(ch,d){let res=[[]];for(let i=0;i<d;i++){const nx=[];for(const r of res)for(const c of ch)nx.push(r.concat([c]));res=nx;}return res;}
+
+/* ---- 標準URFDLBフェイスレット変換（向き規約=Kociemba標準） ---- */
+const KC=(function(){
+  const OFF={U:0,R:9,F:18,D:27,L:36,B:45};
+  function cell(face,r,c){
+    switch(face){
+      case "U": return {x:c-1,y:1,z:r-1,n:"0,1,0"};
+      case "D": return {x:c-1,y:-1,z:1-r,n:"0,-1,0"};
+      case "F": return {x:c-1,y:1-r,z:1,n:"0,0,1"};
+      case "B": return {x:1-c,y:1-r,z:-1,n:"0,0,-1"};
+      case "R": return {x:1,y:1-r,z:1-c,n:"1,0,0"};
+      default:  return {x:-1,y:1-r,z:c-1,n:"-1,0,0"};
+    }
+  }
+  const FCELL=new Array(54);
+  ["U","R","F","D","L","B"].forEach(face=>{for(let r=0;r<3;r++)for(let c=0;c<3;c++)FCELL[OFF[face]+r*3+c]=cell(face,r,c);});
+  function stateToFacelets(state){const f=new Array(54);for(let i=0;i<54;i++){const d=FCELL[i];f[i]=sAt(state,d.x+","+d.y+","+d.z).stickers[d.n];}return f;}
+  const cF=[[8,9,20],[6,18,38],[0,36,47],[2,45,11],[29,26,15],[27,44,24],[33,53,42],[35,17,51]];
+  const cC=[["U","R","F"],["U","F","L"],["U","L","B"],["U","B","R"],["D","F","R"],["D","L","F"],["D","B","L"],["D","R","B"]];
+  const eF=[[5,10],[7,19],[3,37],[1,46],[32,16],[28,25],[30,43],[34,52],[23,12],[21,41],[50,39],[48,14]];
+  const eC=[["U","R"],["U","F"],["U","L"],["U","B"],["D","R"],["D","F"],["D","L"],["D","B"],["F","R"],["F","L"],["B","L"],["B","R"]];
+  function faceletsToCubie(f){
+    const cp=new Array(8),co=new Array(8),ep=new Array(12),eo=new Array(12);
+    for(let i=0;i<8;i++){
+      let o=0;for(;o<3;o++){const col=f[cF[i][o]];if(col==="U"||col==="D")break;}
+      const c1=f[cF[i][(o+1)%3]],c2=f[cF[i][(o+2)%3]];cp[i]=-1;
+      for(let j=0;j<8;j++)if(cC[j][1]===c1&&cC[j][2]===c2){cp[i]=j;break;}
+      co[i]=o%3;
+    }
+    for(let i=0;i<12;i++){ep[i]=-1;eo[i]=0;
+      for(let j=0;j<12;j++){
+        if(f[eF[i][0]]===eC[j][0]&&f[eF[i][1]]===eC[j][1]){ep[i]=j;eo[i]=0;break;}
+        if(f[eF[i][0]]===eC[j][1]&&f[eF[i][1]]===eC[j][0]){ep[i]=j;eo[i]=1;break;}
+      }
+    }
+    return {cp,co,ep,eo};
+  }
+  return {stateToFacelets,faceletsToCubie};
+})();
+
+/* ---- cubie演算・各種インデックス ---- */
+const ID_CUBE={cp:[0,1,2,3,4,5,6,7],co:[0,0,0,0,0,0,0,0],ep:[0,1,2,3,4,5,6,7,8,9,10,11],eo:[0,0,0,0,0,0,0,0,0,0,0,0]};
+const FACE6=["U","R","F","D","L","B"];
+function moveNotation(idx){const p=idx%3;return FACE6[(idx/3)|0]+(p===0?"":p===1?"2":"'");}
+function cubeMult(a,b){
+  const cp=new Array(8),co=new Array(8),ep=new Array(12),eo=new Array(12);
+  for(let i=0;i<8;i++){cp[i]=a.cp[b.cp[i]];co[i]=(a.co[b.cp[i]]+b.co[i])%3;}
+  for(let i=0;i<12;i++){ep[i]=a.ep[b.ep[i]];eo[i]=(a.eo[b.ep[i]]+b.eo[i])&1;}
+  return {cp,co,ep,eo};
+}
+const CNK=[];(function(){for(let n=0;n<13;n++){CNK[n]=[];for(let k=0;k<13;k++)CNK[n][k]=0;CNK[n][0]=1;for(let k=1;k<=n;k++)CNK[n][k]=CNK[n-1][k-1]+CNK[n-1][k];}})();
+function encodePerm(p,n){let idx=0;for(let i=0;i<n;i++){let s=0;for(let j=i+1;j<n;j++)if(p[j]<p[i])s++;idx=idx*(n-i)+s;}return idx;}
+function decodePerm(idx,n){const p=new Array(n),f=new Array(n);f[n-1]=1;for(let i=n-2;i>=0;i--)f[i]=f[i+1]*(n-1-i);const used=new Array(n).fill(false);for(let i=0;i<n;i++){let s=(idx/f[i])|0;idx%=f[i];let cnt=0,v=0;for(v=0;v<n;v++){if(used[v])continue;if(cnt===s)break;cnt++;}used[v]=true;p[i]=v;}return p;}
+function encodeTwist(co){let t=0;for(let i=0;i<7;i++)t=t*3+co[i];return t;}
+function decodeTwist(t){const co=new Array(8);let s=0;for(let i=6;i>=0;i--){co[i]=t%3;s+=co[i];t=(t/3)|0;}co[7]=(3-s%3)%3;return co;}
+function encodeFlip(eo){let t=0;for(let i=0;i<11;i++)t=t*2+eo[i];return t;}
+function decodeFlip(t){const eo=new Array(12);let s=0;for(let i=10;i>=0;i--){eo[i]=t&1;s+=eo[i];t>>=1;}eo[11]=s&1;return eo;}
+function encodeSlice(ep){const o=[];for(let i=0;i<12;i++)if(ep[i]>=8)o.push(i);return CNK[o[3]][4]+CNK[o[2]][3]+CNK[o[1]][2]+CNK[o[0]][1];}
+function decodeSliceOcc(idx){const o=new Array(4);let n=11;for(let k=4;k>=1;k--){while(CNK[n][k]>idx)n--;o[k-1]=n;idx-=CNK[n][k];n--;}return o;}
+function sliceCubeFromIdx(idx){const o=decodeSliceOcc(idx),set={};o.forEach(v=>set[v]=1);const ep=new Array(12);let sp=8,op=0;for(let i=0;i<12;i++){if(set[i])ep[i]=sp++;else ep[i]=op++;}return {cp:ID_CUBE.cp.slice(),co:ID_CUBE.co.slice(),ep,eo:ID_CUBE.eo.slice()};}
+
+/* ---- テーブル（初回solve時に1度だけ生成） ---- */
+let moveCube18=null,twistMove,flipMove,sliceMove,cornMove,edge8Move,slice2Move,pruneTS,pruneFS,pruneCS,pruneES,SLICE_SOLVED,PH2_MOVES,solverReady=false,SOLVE_BUDGET=400;
+function buildMoveCubes(){
+  const basic=[];
+  for(let f=0;f<6;f++){const s=createSolved();applyMoveState(FACE6[f],s);basic[f]=KC.faceletsToCubie(KC.stateToFacelets(s));}
+  moveCube18=new Array(18);
+  for(let f=0;f<6;f++){const q=basic[f];moveCube18[f*3]=q;moveCube18[f*3+1]=cubeMult(q,q);moveCube18[f*3+2]=cubeMult(cubeMult(q,q),q);}
+}
+function buildTwistMove(){twistMove=new Array(2187);for(let t=0;t<2187;t++){twistMove[t]=new Int16Array(18);const cube={cp:ID_CUBE.cp.slice(),co:decodeTwist(t),ep:ID_CUBE.ep.slice(),eo:ID_CUBE.eo.slice()};for(let m=0;m<18;m++)twistMove[t][m]=encodeTwist(cubeMult(cube,moveCube18[m]).co);}}
+function buildFlipMove(){flipMove=new Array(2048);for(let t=0;t<2048;t++){flipMove[t]=new Int16Array(18);const cube={cp:ID_CUBE.cp.slice(),co:ID_CUBE.co.slice(),ep:ID_CUBE.ep.slice(),eo:decodeFlip(t)};for(let m=0;m<18;m++)flipMove[t][m]=encodeFlip(cubeMult(cube,moveCube18[m]).eo);}}
+function buildSliceMove(){sliceMove=new Array(495);for(let s=0;s<495;s++){sliceMove[s]=new Int16Array(18);const cube=sliceCubeFromIdx(s);for(let m=0;m<18;m++)sliceMove[s][m]=encodeSlice(cubeMult(cube,moveCube18[m]).ep);}}
+function buildCornMove(){cornMove=new Array(40320);for(let p=0;p<40320;p++){cornMove[p]=new Int32Array(10);const cube={cp:decodePerm(p,8),co:ID_CUBE.co.slice(),ep:ID_CUBE.ep.slice(),eo:ID_CUBE.eo.slice()};for(let mi=0;mi<10;mi++)cornMove[p][mi]=encodePerm(cubeMult(cube,moveCube18[PH2_MOVES[mi]]).cp,8);}}
+function buildEdge8Move(){edge8Move=new Array(40320);for(let p=0;p<40320;p++){edge8Move[p]=new Int32Array(10);const e8=decodePerm(p,8),ep=new Array(12);for(let i=0;i<8;i++)ep[i]=e8[i];for(let i=8;i<12;i++)ep[i]=i;const cube={cp:ID_CUBE.cp.slice(),co:ID_CUBE.co.slice(),ep,eo:ID_CUBE.eo.slice()};for(let mi=0;mi<10;mi++){const ne=cubeMult(cube,moveCube18[PH2_MOVES[mi]]).ep;edge8Move[p][mi]=encodePerm([ne[0],ne[1],ne[2],ne[3],ne[4],ne[5],ne[6],ne[7]],8);}}}
+function buildSlice2Move(){slice2Move=new Array(24);for(let p=0;p<24;p++){slice2Move[p]=new Int32Array(10);const s4=decodePerm(p,4),ep=new Array(12);for(let i=0;i<8;i++)ep[i]=i;for(let i=0;i<4;i++)ep[8+i]=8+s4[i];const cube={cp:ID_CUBE.cp.slice(),co:ID_CUBE.co.slice(),ep,eo:ID_CUBE.eo.slice()};for(let mi=0;mi<10;mi++){const ne=cubeMult(cube,moveCube18[PH2_MOVES[mi]]).ep;slice2Move[p][mi]=encodePerm([ne[8]-8,ne[9]-8,ne[10]-8,ne[11]-8],4);}}}
+function bfsPrune(sizeA,sizeB,moveA,moveB,startA,startB,nmoves){
+  const tot=sizeA*sizeB,dist=new Uint8Array(tot);dist.fill(255);
+  let frontier=[startA*sizeB+startB];dist[frontier[0]]=0;let d=0;
+  while(frontier.length){const nf=[];for(let qi=0;qi<frontier.length;qi++){const st=frontier[qi],a=(st/sizeB)|0,b=st%sizeB,ra=moveA[a],rb=moveB[b];for(let m=0;m<nmoves;m++){const ni=ra[m]*sizeB+rb[m];if(dist[ni]===255){dist[ni]=d+1;nf.push(ni);}}}frontier=nf;d++;}
+  return dist;
+}
+function initSolver(){
+  if(solverReady)return;
+  PH2_MOVES=[0,1,2,9,10,11,4,7,13,16];
+  buildMoveCubes();buildTwistMove();buildFlipMove();buildSliceMove();buildCornMove();buildEdge8Move();buildSlice2Move();
+  SLICE_SOLVED=encodeSlice(ID_CUBE.ep);
+  pruneTS=bfsPrune(2187,495,twistMove,sliceMove,0,SLICE_SOLVED,18);
+  pruneFS=bfsPrune(2048,495,flipMove,sliceMove,0,SLICE_SOLVED,18);
+  pruneCS=bfsPrune(40320,24,cornMove,slice2Move,0,0,10);
+  pruneES=bfsPrune(40320,24,edge8Move,slice2Move,0,0,10);
+  solverReady=true;
+}
+
+/* ---- 妥当性チェック（解けない配置を検出） ---- */
+function validCube(c){
+  if(c.cp.indexOf(-1)>=0||c.ep.indexOf(-1)>=0)return false;
+  if(new Set(c.cp).size!==8||new Set(c.ep).size!==12)return false;
+  let so=0;for(const v of c.co)so+=v;if(so%3!==0)return false;
+  let se=0;for(const v of c.eo)se+=v;if(se%2!==0)return false;
+  const par=p=>{const n=p.length,seen=new Array(n).fill(false);let pc=0;for(let i=0;i<n;i++){if(seen[i])continue;let j=i,l=0;while(!seen[j]){seen[j]=true;j=p[j];l++;}pc+=l-1;}return pc&1;};
+  return par(c.cp)===par(c.ep);
+}
+
+/* ---- 2段階探索（IDA*） ---- */
+function ph2solve(cp,e8,s2,maxl,lastFromP1){
+  if(maxl<0)return null;
+  if(Math.max(pruneCS[cp*24+s2],pruneES[e8*24+s2])>maxl)return null;
+  const seq=[];let result=null;
+  function dfs(cp,e8,s2,depth,limit,last){
+    if(result)return;
+    if(cp===0&&e8===0&&s2===0){result=seq.slice();return;}
+    if(depth===limit)return;
+    if(Math.max(pruneCS[cp*24+s2],pruneES[e8*24+s2])>limit-depth)return;
+    for(let mi=0;mi<10;mi++){
+      const m=PH2_MOVES[mi],fc=(m/3)|0;
+      if(last>=0){const lf=(last/3)|0;if(fc===lf)continue;if(depth>0&&(fc%3)===(lf%3)&&fc<lf)continue;}
+      seq.push(m);
+      dfs(cornMove[cp][mi],edge8Move[e8][mi],slice2Move[s2][mi],depth+1,limit,m);
+      seq.pop();
+      if(result)return;
+    }
+  }
+  for(let limit=Math.max(pruneCS[cp*24+s2],pruneES[e8*24+s2]);limit<=maxl;limit++){dfs(cp,e8,s2,0,limit,lastFromP1);if(result)return result;}
+  return null;
+}
+function twoPhase(cube){
+  initSolver();
+  const t0=encodeTwist(cube.co),f0=encodeFlip(cube.eo),s0=encodeSlice(cube.ep);
+  const lb1=Math.max(pruneTS[t0*495+s0],pruneFS[f0*495+s0]);
+  let best=null,foundFirst=false,deadline=0;
+  const seq1=[],MAXD1=13,MAXTOTAL=30;
+  function result_stop(){return foundFirst&&(performance.now()>deadline||(best&&best.len<=20));}
+  function ph1(t,f,s,depth,d1,last){
+    if(result_stop())return;
+    if(depth===d1){
+      if(t===0&&f===0&&s===SLICE_SOLVED){
+        let g=cube;for(let i=0;i<seq1.length;i++)g=cubeMult(g,moveCube18[seq1[i]]);
+        const cpc=encodePerm(g.cp,8),e8=encodePerm([g.ep[0],g.ep[1],g.ep[2],g.ep[3],g.ep[4],g.ep[5],g.ep[6],g.ep[7]],8),sl2=encodePerm([g.ep[8]-8,g.ep[9]-8,g.ep[10]-8,g.ep[11]-8],4);
+        const cap=(best?best.len:MAXTOTAL)-d1-1;
+        const p2=ph2solve(cpc,e8,sl2,cap,seq1.length?seq1[seq1.length-1]:-1);
+        if(p2){best={len:d1+p2.length,p1:seq1.slice(),p2:p2};if(!foundFirst){foundFirst=true;deadline=performance.now()+SOLVE_BUDGET;}}
+      }
+      return;
+    }
+    if(Math.max(pruneTS[t*495+s],pruneFS[f*495+s])>d1-depth)return;
+    for(let m=0;m<18;m++){
+      const fc=(m/3)|0;
+      if(last>=0){const lf=(last/3)|0;if(fc===lf)continue;if((fc%3)===(lf%3)&&fc<lf)continue;}
+      seq1.push(m);
+      ph1(twistMove[t][m],flipMove[f][m],sliceMove[s][m],depth+1,d1,m);
+      seq1.pop();
+      if(result_stop())return;
+    }
+  }
+  for(let d1=lb1;d1<=MAXD1;d1++){
+    if(best&&d1>=best.len)break;
+    ph1(t0,f0,s0,0,d1,-1);
+    if(result_stop())break;
+  }
+  return best;
+}
+function mergeMoves(seq){
+  const amt=m=>m.endsWith("2")?2:m.endsWith("'")?3:1,fc=m=>m[0],tok=(f,a)=>{a=((a%4)+4)%4;return a===0?null:f+(a===1?"":a===2?"2":"'");};
+  let out=seq.slice(),ch=true;
+  while(ch){ch=false;const r=[];let i=0;while(i<out.length){if(i+1<out.length&&fc(out[i].move)===fc(out[i+1].move)){const t=tok(fc(out[i].move),amt(out[i].move)+amt(out[i+1].move));if(t)r.push({phase:out[i].phase,move:t});ch=true;i+=2;}else{r.push(out[i]);i++;}}out=r;}
+  return out;
+}
+window.__K={initSolver:()=>initSolver(),setBudget:ms=>{SOLVE_BUDGET=ms;},ready:()=>solverReady};
 
 function solveCube(start){
-  let S=cloneState(start); const sol=[];
-  const mv=(ph,seq)=>seq.split(" ").forEach(m=>{if(m){applyMoveState(m,S);sol.push({phase:ph,move:m});}});
-  const at=k=>sAt(S,k), find=cs=>sFind(S,cs);
-  const conj=(k,alg)=>(UKj[k]+" "+alg+" "+UKIj[k]).trim();
-  const Uadj=(ph,cond)=>{for(let k=0;k<4;k++){const T=cloneState(S);sApply(T,UKj[k]);if(cond(T)){if(UKj[k])mv(ph,UKj[k]);return true;}}return false;};
-  const whiteup=f=>{const c=at(UEDGE[f]);return !!c&&c.stickers["0,1,0"]==="D";};
-  const ensureEmpty=g=>{if(whiteup(g))Uadj("cross",T=>{const c=sAt(T,UEDGE[g]);return !(c&&c.stickers["0,1,0"]==="D");});};
-  for(const color of FRBL){let cap=0;
-    while(true){ if(++cap>60)throw new Error("cross");
-      const e=find(["D",color]),p=e.pos,key=pk(p),wn=sNormalOf(e,"D");
-      if(p.y===1&&wn==="0,1,0")break;
-      if(p.y===1){const sf=NORMAL_KEY[wn];for(const cd of [sf,sf+"'"]){const T=cloneState(S);sApply(T,cd);if(sFind(T,["D",color]).pos.y===0){mv("cross",cd);break;}}continue;}
-      if(p.y===0){const fs=facesOfEdge(key);let done=false;
-        for(const g of fs){for(const cd of [g,g+"'"]){const T=cloneState(S);sApply(T,cd);const ee=sFind(T,["D",color]);if(ee.pos.y===1&&ee.stickers["0,1,0"]==="D"){ensureEmpty(g);mv("cross",cd);done=true;break;}}if(done)break;}
-        if(!done){const g=fs[0];ensureEmpty(g);for(const cd of [g,g+"'"]){const T=cloneState(S);sApply(T,cd);if(sFind(T,["D",color]).pos.y===1){mv("cross",cd);break;}}}
-        continue;}
-      const sf=FRBL.find(g=>DEDGE[g]===key);
-      if(wn==="0,-1,0"){ensureEmpty(sf);mv("cross",sf+"2");}
-      else{ensureEmpty(sf);for(const cd of [sf,sf+"'"]){const T=cloneState(S);sApply(T,cd);if(sFind(T,["D",color]).pos.y===0){mv("cross",cd);break;}}}
-    }
-  }
-  for(const f of FRBL){Uadj("cross",T=>{const c=sAt(T,UEDGE[f]);return !!c&&c.stickers["0,1,0"]==="D"&&setEq(Object.values(c.stickers),["D",f]);});mv("cross",f+"2");}
-  const cdone=f=>{const c=find(["D",f,RGT[f]]);return pk(c.pos)===SLOTC[f]&&c.stickers["0,-1,0"]==="D";};
-  for(const f of FRBL){let cap=0;
-    while(!cdone(f)){ if(++cap>40)throw new Error("layer1");
-      const c=find(["D",f,RGT[f]]),p=c.pos,key=pk(p);
-      if(p.y===-1&&key!==SLOTC[f]){const g=FRBL.find(gg=>SLOTC[gg]===key);mv("layer1",`${RGT[g]} U ${RGT[g]}'`);continue;}
-      if(key===SLOTC[f]&&c.stickers["0,-1,0"]!=="D"){mv("layer1",`${RGT[f]} U ${RGT[f]}'`);continue;}
-      if(p.y===1){ if(key!==UCORN[f]){Uadj("layer1",T=>pk(sFind(T,["D",f,RGT[f]]).pos)===UCORN[f]);continue;} mv("layer1",`${RGT[f]} U ${RGT[f]}' U'`);continue;}
-    }
-  }
-  const mdone=f=>{const c=find([f,RGT[f]]);return pk(c.pos)===MIDk[f]&&c.stickers[nrm(f)]===f&&c.stickers[nrm(RGT[f])]===RGT[f];};
-  const rIns=fr=>mv("layer2",`U ${RGT[fr]} U' ${RGT[fr]}' U' ${fr}' U ${fr}`);
-  const lIns=fr=>mv("layer2",`U' ${LFT[fr]}' U ${LFT[fr]} U ${fr} U' ${fr}'`);
-  for(const f of FRBL){let cap=0;
-    while(!mdone(f)){ if(++cap>40)throw new Error("layer2");
-      const e=find([f,RGT[f]]),p=e.pos;
-      if(p.y===0){const g=FRBL.find(gg=>MIDk[gg]===pk(p));rIns(g);continue;}
-      if(p.y===1){
-        const matched=T=>{const c=sFind(T,[f,RGT[f]]),side=Object.keys(c.stickers).find(k=>k!=="0,1,0");return c.stickers[side]===NORMAL_KEY[side];};
-        if(!matched(S)){Uadj("layer2",matched);continue;}
-        const c=find([f,RGT[f]]),side=Object.keys(c.stickers).find(k=>k!=="0,1,0"),fr=NORMAL_KEY[side],top=c.stickers["0,1,0"];
-        if(top===RGT[fr])rIns(fr);else if(top===LFT[fr])lIns(fr);else mv("layer2","U");
-        continue;}
-      mv("layer2","U");
-    }
-  }
-  const ups=()=>FRBL.filter(f=>at(UEDGE[f]).stickers["0,1,0"]==="U");
-  {let cap=0;while(ups().length!==4){ if(++cap>10)throw new Error("ycross");
-    const u=ups();
-    if(u.length===2){const opp=(u.includes("F")&&u.includes("B"))||(u.includes("L")&&u.includes("R"));const tgt=opp?["L","R"]:["B","L"];
-      Uadj("ycross",T=>setEq(FRBL.filter(f=>sAt(T,UEDGE[f]).stickers["0,1,0"]==="U"),tgt));}
-    mv("ycross",ALG_OLL);
-  }}
-  const allUp=T=>FRBL.every(f=>sAt(T,UCORN[f]).stickers["0,1,0"]==="U");
-  if(!allUp(S)){const choices=[];for(let k=0;k<4;k++)for(const a of [ALG_SUNE,ALG_ANTI])choices.push([k,a]);let done=false;
-    for(let d=1;d<=3&&!done;d++){for(const combo of cartesian(choices,d)){const seq=combo.map(([k,a])=>(UKj[k]+" "+a).trim()).join(" ");const T=cloneState(S);sApply(T,seq);if(allUp(T)){mv("ocorner",seq);done=true;break;}}}
-    if(!done)throw new Error("ocorner");
-  }
-  const parity=T=>{const home={};FRBL.forEach(f=>home[["U",f,RGT[f]].sort().join("")]=UCORN[f]);const perm={};FRBL.forEach(f=>{perm[UCORN[f]]=home[Object.values(sAt(T,UCORN[f]).stickers).sort().join("")];});const seen=new Set();let par=0;for(const f of FRBL){let x=UCORN[f];if(seen.has(x))continue;let l=0;while(!seen.has(x)){seen.add(x);x=perm[x];l++;}par+=l-1;}return par%2;};
-  if(parity(S)===1)mv("cperm",ALG_T);
-  const positioned=T=>FRBL.every(f=>setEq(Object.values(sAt(T,UCORN[f]).stickers),["U",f,RGT[f]]));
-  {let cap=0;while(!positioned(S)){ if(++cap>12)throw new Error("cperm");let placed=false;
-    for(let k=0;k<4&&!placed;k++)for(const rep of [1,2]){const seq=conj(k,Array(rep).fill(ALG_A).join(" "));const T=cloneState(S);sApply(T,seq);if(positioned(T)){mv("cperm",seq);placed=true;break;}}
-    if(!placed)mv("cperm",ALG_A);
-  }}
-  const ema=T=>FRBL.every(f=>sAt(T,UEDGE[f]).stickers[nrm(f)]===f);
-  {let cap=0;while(!ema(S)){ if(++cap>12)throw new Error("eperm");let placed=false;
-    for(let k=0;k<4&&!placed;k++)for(const alg of [ALG_UA,ALG_UB]){const seq=conj(k,alg);const T=cloneState(S);sApply(T,seq);if(ema(T)){mv("eperm",seq);placed=true;break;}}
-    if(!placed)mv("eperm",conj(0,ALG_UA));
-  }}
-  for(let k=0;k<4;k++){const T=cloneState(S);sApply(T,UKj[k]);if(isSolvedState(T)){if(UKj[k])mv("eperm",UKj[k]);break;}}
-  if(!isSolvedState(S))throw new Error("final");
-  return cleanupTagged(sol);
+  initSolver();
+  const cube=KC.faceletsToCubie(KC.stateToFacelets(start));
+  if(!validCube(cube))throw new Error("invalid cube");
+  const res=twoPhase(cube);
+  if(!res)throw new Error("no solution");
+  const out=[];
+  for(let i=0;i<res.p1.length;i++)out.push({phase:"p1",move:moveNotation(res.p1[i])});
+  for(let i=0;i<res.p2.length;i++)out.push({phase:"p2",move:moveNotation(res.p2[i])});
+  return mergeMoves(out);
 }
 
 /* ===================== INPUT + SOLVE MODE ===================== */
 let mode="solve", solution=[], solIndex=-1, userState=null, phaseSpans=[], netColors={}, currentPaint="F";
 const COLORNAME={U:"黄",D:"白",F:"赤",B:"橙",R:"緑",L:"青"};
-const PHASE_ORDER=["cross","layer1","layer2","ycross","ocorner","cperm","eperm"];
+const PHASE_ORDER=["p1","p2"];
 const PHASEMETA={
-  cross:{name:"① 白い十字（白クロス）",desc:"白い面のエッジ4つを白センターのまわりに集め、側面の色も合わせて十字を作ります。"},
-  layer1:{name:"② 1段目の角",desc:"白を含む角を1つずつ下段へ入れ、白い面（1段目）を完成させます。"},
-  layer2:{name:"③ 2段目のエッジ",desc:"黄色を含まない中段のエッジを、左右の正しい位置へ入れます。"},
-  ycross:{name:"④ 黄色い十字",desc:"上面の黄色いエッジを十字にそろえます（角の向きはまだ気にしません）。"},
-  ocorner:{name:"⑤ 黄色い面を完成",desc:"上の角の向きをそろえ、黄色い面を完成させます。"},
-  cperm:{name:"⑥ 角の位置を合わせる",desc:"黄色い角を正しい位置へ入れ替えます（向きは保ったまま）。"},
-  eperm:{name:"⑦ 辺を合わせて完成",desc:"最後に残ったエッジを入れ替え、6面を完成させます。"}
+  p1:{name:"① 前半：向きをそろえる",desc:"コンピュータ探索（Kociemba 2段階法）が見つけた最短手順の前半です。角と辺の向きをそろえ、中央の帯の辺を所定の位置に集めます。"},
+  p2:{name:"② 後半：位置を合わせて完成",desc:"向きを保ったまま、すべてのコマを正しい位置へ運び、6面を完成させます。"}
 };
 function mapCell(face,row,col){let x,y,z,n;
   if(face==="U"){y=1;z=row-1;x=col-1;n="0,1,0";}
@@ -720,6 +798,8 @@ document.addEventListener("keydown",e=>{
 setupDrag();
 buildPalette();buildNetEditor();initNet();
 setMode("solve");
+/* ソルバのテーブルを先読み（初回「解く」で待たせない） */
+setTimeout(()=>{try{initSolver();}catch(e){}},300);
 </script>
 </body>
 </html>
