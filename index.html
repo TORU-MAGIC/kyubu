@@ -253,6 +253,7 @@ canvas{max-width:100%;height:auto}
 
 <script>
 const FACE_COLORS={U:"U",D:"D",F:"F",B:"B",R:"R",L:"L"};
+const FACE_KEYS=["U","D","F","B","R","L"];
 const NORMALS={U:[0,1,0],D:[0,-1,0],F:[0,0,1],B:[0,0,-1],R:[1,0,0],L:[-1,0,0]};
 const NORMAL_KEY={"0,1,0":"U","0,-1,0":"D","0,0,1":"F","0,0,-1":"B","1,0,0":"R","-1,0,0":"L"};
 const FACE_TRANSFORMS={
@@ -317,6 +318,27 @@ function createSolved(){
   return arr;
 }
 function cloneState(state){return state.map(c=>({id:c.id,pos:{...c.pos},stickers:{...c.stickers}}))}
+function restoreState(target,backup){target.splice(0,target.length,...cloneState(backup))}
+function validateStateIntegrity(state){
+  if(state.length!==26)return `キューブ部品数が${state.length}個です`;
+  const positions=new Set(), counts={U:0,D:0,F:0,B:0,R:0,L:0}, normals=new Set(Object.keys(NORMAL_KEY));
+  let stickers=0;
+  for(const c of state){
+    const posKey=pk(c.pos);
+    if(positions.has(posKey))return `同じ位置に複数の部品があります: ${posKey}`;
+    positions.add(posKey);
+    for(const [normal,color] of Object.entries(c.stickers)){
+      if(!normals.has(normal))return `不正なステッカー向きです: ${normal}`;
+      if(!(color in counts))return `不正な色です: ${color}`;
+      const [nx,ny,nz]=normal.split(",").map(Number);
+      if((nx&&c.pos.x!==nx)||(ny&&c.pos.y!==ny)||(nz&&c.pos.z!==nz))return `ステッカー位置が部品位置と矛盾しています: ${posKey}/${normal}`;
+      counts[color]++; stickers++;
+    }
+  }
+  if(stickers!==54)return `ステッカー数が${stickers}枚です`;
+  for(const f of FACE_KEYS)if(counts[f]!==9)return `${f}色が${counts[f]}枚です`;
+  return "";
+}
 function currentVariant(){return STEPS[stage].variants[variant]}
 function inverseMove(m){
   if(m.includes("2"))return m;
@@ -352,8 +374,11 @@ function applyQuarter(info,state){
   });
 }
 function applyMoveState(m,state=cubies){
+  const backup=cloneState(state);
   const info=parseMove(m);
   for(let i=0;i<info.turns;i++)applyQuarter(info,state);
+  const err=validateStateIntegrity(state);
+  if(err){restoreState(state,backup);throw new Error(`move ${m} broke cube state: ${err}`);}
 }
 function transformForPos(p){return `translate3d(${p.x*68}px,${-p.y*68}px,${p.z*68}px)`}
 function makeCubieEl(c){
@@ -417,7 +442,7 @@ function prevMove(){
   moveIndex--;
   animateMove(inv);
 }
-function resetAlgorithm(){stopAuto();setupForAlgorithm();renderCube();updateUI()}
+function resetAlgorithm(){if(turning)return;stopAuto();setupForAlgorithm();renderCube();updateUI()}
 function jumpStage(i){if(turning)return;done[stage]=true;stage=i;variant=0;setupForAlgorithm();renderCube();updateUI()}
 function setVariant(i){if(turning)return;variant=i;setupForAlgorithm();renderCube();updateUI()}
 function updateUI(){
@@ -437,7 +462,11 @@ function updateUI(){
   setButtons();
   drawNet();
 }
+function setSceneLocks(){
+  document.querySelectorAll("[data-view],#tabSolve,#tabLearn,#restart,#restartSolve,#backToInput,#solveAgain").forEach(b=>b.disabled=turning);
+}
 function setButtons(){
+  setSceneLocks();
   if(mode==="solve"){
     const atEnd=solIndex>=solution.length-1;
     document.getElementById("playMove").disabled=turning||atEnd||!solution.length;
@@ -498,9 +527,9 @@ function drawNet(){
 }
 function setupDrag(){
   const wrap=document.getElementById("sceneWrap");
-  wrap.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};wrap.setPointerCapture(e.pointerId)});
+  wrap.addEventListener("pointerdown",e=>{if(turning)return;drag={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y};wrap.setPointerCapture(e.pointerId)});
   wrap.addEventListener("pointermove",e=>{
-    if(!drag)return;
+    if(!drag||turning)return;
     view.x=Math.max(-80,Math.min(30,drag.vx-(e.clientY-drag.y)*.35));
     view.y=drag.vy+(e.clientX-drag.x)*.45;
     cubeEl.style.transform=`rotateX(${view.x}deg) rotateY(${view.y}deg)`;
@@ -740,14 +769,28 @@ function validateNet(){
 function showInput(){document.getElementById("inputPanel").style.display="";["phasePanel","solveMovesPanel","solveExplainPanel"].forEach(id=>document.getElementById(id).style.display="none");document.getElementById("solveCompletion").classList.remove("show");document.getElementById("stageLabel").textContent="じぶんのキューブを入力";document.getElementById("stageTitle").textContent="展開図を塗ってください";document.getElementById("stageSub").textContent="右の図を、お手持ちのキューブと同じ色に塗って『この状態を解く』を押します。";document.getElementById("nextMove").textContent="🎨";document.getElementById("moveHelp").textContent="色を塗って解いてね";}
 function showPlayback(){document.getElementById("inputPanel").style.display="none";["phasePanel","solveMovesPanel","solveExplainPanel"].forEach(id=>document.getElementById(id).style.display="");}
 function computePhases(){phaseSpans=[];solution.forEach((s,i)=>{const last=phaseSpans[phaseSpans.length-1];if(last&&last.phase===s.phase)last.end=i;else phaseSpans.push({phase:s.phase,start:i,end:i});});}
-function runSolve(){const res=validateNet();if(typeof res==="string"){document.getElementById("valmsg").textContent="⚠ "+res;return;}solution=res.sol;userState=res.state;computePhases();startPlayback();}
+function runSolve(){if(turning)return;const res=validateNet();if(typeof res==="string"){document.getElementById("valmsg").textContent="⚠ "+res;return;}solution=res.sol;userState=res.state;computePhases();startPlayback();}
 function startPlayback(){stopAuto();showPlayback();cubies=cloneState(userState);solIndex=-1;renderCube();updateSolveUI();}
-function restartPlayback(){stopAuto();cubies=cloneState(userState);solIndex=-1;renderCube();updateSolveUI();}
+function restartPlayback(){if(turning)return;stopAuto();cubies=cloneState(userState);solIndex=-1;renderCube();updateSolveUI();}
 async function solveNext(){if(solIndex>=solution.length-1||turning)return;solIndex++;updateSolveUI();await animateMove(solution[solIndex].move);}
 function solvePrev(){if(turning||solIndex<0)return;const inv=inverseMove(solution[solIndex].move);solIndex--;animateMove(inv);}
 async function solveAuto(){if(turning)return;if(autoTimer){stopAuto();return;}document.getElementById("autoPlay").textContent="停止";autoTimer=true;while(autoTimer&&solIndex<solution.length-1){await solveNext();await wait(140);}stopAuto();}
 function updateSolveUI(){
   const total=solution.length,nextI=solIndex+1;
+  if(total===0){
+    document.getElementById("progressText").textContent="完成";
+    document.getElementById("stageLabel").textContent="じぶんのキューブを解く";
+    document.getElementById("stageTitle").textContent="すでに完成しています";
+    document.getElementById("stageSub").textContent="入力された状態は6面完成済みです。動かす手順はありません。";
+    document.getElementById("phaseDesc").textContent="";
+    document.getElementById("phaseList").innerHTML="";
+    document.getElementById("nextMove").textContent="完成";
+    document.getElementById("moveHelp").textContent="6面完成です！";
+    document.getElementById("solveMoves").innerHTML="";
+    document.getElementById("solveExplain").innerHTML="";
+    document.getElementById("solveCompletion").classList.add("show");
+    setButtons();drawNet();return;
+  }
   document.getElementById("progressText").textContent=`手 ${Math.min(solIndex+1,total)} / ${total}`;
   const curPhase=nextI<total?solution[nextI].phase:(total?solution[total-1].phase:"cross");
   const meta=PHASEMETA[curPhase];
@@ -768,8 +811,8 @@ function updateSolveUI(){
   setButtons();drawNet();
 }
 function randScramble(n){const fs=["U","D","F","B","R","L"],sx=["","'","2"];let last="",out=[];for(let i=0;i<n;i++){let f=fs[Math.random()*6|0];while(f===last)f=fs[Math.random()*6|0];last=f;out.push(f+sx[Math.random()*3|0]);}return out.join(" ");}
-function loadExample(){const st=createSolved();sApply(st,randScramble(25));fillNetFromState(st);renderNet();renderPreview();document.getElementById("valmsg").textContent="ランダムな例を入れました。「この状態を解く」を押してね。";}
-function setMode(m){stopAuto();mode=m;document.getElementById("tabSolve").classList.toggle("active",m==="solve");document.getElementById("tabLearn").classList.toggle("active",m==="learn");document.getElementById("solveSide").style.display=m==="solve"?"block":"none";document.getElementById("learnSide").style.display=m==="learn"?"block":"none";
+function loadExample(){if(turning)return;const st=createSolved();sApply(st,randScramble(25));fillNetFromState(st);renderNet();renderPreview();document.getElementById("valmsg").textContent="ランダムな例を入れました。「この状態を解く」を押してね。";}
+function setMode(m){if(turning)return;stopAuto();mode=m;document.getElementById("tabSolve").classList.toggle("active",m==="solve");document.getElementById("tabLearn").classList.toggle("active",m==="learn");document.getElementById("solveSide").style.display=m==="solve"?"block":"none";document.getElementById("learnSide").style.display=m==="learn"?"block":"none";
   if(m==="learn"){setupForAlgorithm();renderCube();updateUI();}
   else{if(!solution.length){showInput();renderNet();renderPreview();document.getElementById("progressText").textContent="";}else{showPlayback();cubies=cloneState(userState);for(let i=0;i<=solIndex;i++)applyMoveState(solution[i].move,cubies);renderCube();updateSolveUI();}}
 }
@@ -780,16 +823,16 @@ $("playMove").onclick=()=>mode==="solve"?solveNext():nextMove();
 $("prevMove").onclick=()=>mode==="solve"?solvePrev():prevMove();
 $("autoPlay").onclick=()=>mode==="solve"?solveAuto():autoPlay();
 $("resetAlg").onclick=()=>mode==="solve"?restartPlayback():resetAlgorithm();
-$("restart").onclick=()=>{done={};stage=0;variant=0;resetAlgorithm();};
+$("restart").onclick=()=>{if(turning)return;done={};stage=0;variant=0;resetAlgorithm();};
 $("solveBtn").onclick=runSolve;
 $("scrambleBtn").onclick=loadExample;
-$("clearBtn").onclick=()=>{initNet();renderNet();renderPreview();$("valmsg").textContent="";};
-$("backToInput").onclick=()=>{stopAuto();solution=[];showInput();renderPreview();$("progressText").textContent="";};
+$("clearBtn").onclick=()=>{if(turning)return;initNet();renderNet();renderPreview();$("valmsg").textContent="";};
+$("backToInput").onclick=()=>{if(turning)return;stopAuto();solution=[];showInput();renderPreview();$("progressText").textContent="";};
 $("restartSolve").onclick=restartPlayback;
-$("solveAgain").onclick=()=>{stopAuto();solution=[];initNet();showInput();renderNet();renderPreview();$("progressText").textContent="";};
+$("solveAgain").onclick=()=>{if(turning)return;stopAuto();solution=[];initNet();showInput();renderNet();renderPreview();$("progressText").textContent="";};
 $("tabSolve").onclick=()=>setMode("solve");
 $("tabLearn").onclick=()=>setMode("learn");
-document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{view={...VIEW_PRESETS[b.dataset.view]};renderCube();});
+document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{if(turning)return;view={...VIEW_PRESETS[b.dataset.view]};renderCube();});
 document.addEventListener("keydown",e=>{
   if(e.key==="ArrowRight"){e.preventDefault();mode==="solve"?solveNext():nextMove();}
   if(e.key==="ArrowLeft"){e.preventDefault();mode==="solve"?solvePrev():prevMove();}
